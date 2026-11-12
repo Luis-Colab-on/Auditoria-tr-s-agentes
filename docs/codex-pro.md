@@ -228,6 +228,27 @@ exportadas: exportação inclui evidências, justificativas estruturadas e hashe
 credenciais, wire frames ou raciocínio privado. O código enviado é processado
 remotamente pela OpenAI sob as políticas da conta, mesmo com Docker local.
 
+### Prazo e observação do despacho
+
+Antes de escrever `turn/start`, o transporte reconfere o menor prazo monotônico
+global, por turno e financeiro, depois de construir e serializar a requisição.
+Também verifica novamente a validade factual do horário financeiro original.
+Atrasos de reserva ou persistência não estendem o prazo. Comandos de interrupção
+de um turno existente continuam disponíveis depois desse prazo.
+
+Se nenhuma escrita foi tentada, checkpoint e ledger registram `not_sent`.
+A reserva continua contando no limite e a retomada não reenvia automaticamente.
+`written` comprova apenas a escrita local; `write_uncertain` registra uma falha
+durante a tentativa de escrita. Sem resposta final confirmada, ambos preservam
+o estado ambíguo e a recuperação explícita já exigida. Nenhum desses estados
+converte consumo desconhecido em zero ou renova fatos financeiros.
+
+A regressão local usa somente pipes em memória e relógio controlado:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -q tests/test_dispatch_deadline.py
+```
+
 Fontes oficiais consultadas em 10 e 11/11/2026:
 
 - [App Server e ferramentas dinâmicas](https://learn.chatgpt.com/docs/app-server)

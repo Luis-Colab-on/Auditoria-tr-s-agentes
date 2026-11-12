@@ -91,6 +91,9 @@ def main(argv=None):
         if command == "export":
             sp.add_argument("--output", type=Path)
             sp.add_argument("--evidence", action="append")
+    review = sub.add_parser('review-completion', help='avaliar offline as notas do smoke sintético; preservar o run original')
+    review.add_argument('id')
+    review.add_argument('--output', type=Path, required=True, help='arquivo novo para avaliação separada')
     args = parser.parse_args(argv)
     try:
         if args.command == "doctor":
@@ -130,6 +133,16 @@ def main(argv=None):
             state = asyncio.run(Workflow(store, run_id).run(resume=args.command == "resume"))
             emit(state)
             return 0 if state["status"] == "completed" else 2
+        if args.command == 'review-completion':
+            from .report import build_report
+            from .scope_review import review_report
+            from .security import canonical
+            result = review_report(build_report(store, run_id, use_review=False))
+            # Exclusive creation prevents overwriting any historical artifact.
+            with args.output.open('xb') as destination:
+                destination.write(canonical(result))
+            emit(result)
+            return 0 if result['completion_assessment']['status'] == 'completed' else 2
         if args.command == "status":
             emit({"state": store.get(run_id, "state"), "usage": store.get(run_id, "ledger"), "cancel_requested": store.exists(run_id, "cancel")})
         elif args.command == "cancel":

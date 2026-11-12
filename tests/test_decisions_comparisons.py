@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from audit3.comparison import read_comparison, register_comparison
 from audit3.report import build_report, export_zip
-from audit3.schemas import Judgment, Opinion, Verdict
-from audit3.security import PolicyError
+from audit3.schemas import Judgment, Opinion, Verdict, EvidenceReceipt, SourceRef
+from audit3.security import PolicyError, digest, object_hash, now
 from audit3.workflow import Workflow
 from helpers import MockRuntime
 from test_tools_schemas import finding, tools_for
@@ -50,22 +50,69 @@ def test_new_final_finding_stays_pending_without_mandatory_fix(make_run, monkeyp
     assert report["verdicts"][0]["decision"] == "investigar"
 
 
-def test_defender_findings_are_included_and_duplicate_ids_keep_one_cause(make_run, monkeypatch):
+@pytest.mark.parametrize('certified', [True, False])
+def test_defender_findings_are_included_and_duplicate_ids_keep_one_cause(make_run, monkeypatch, certified):
+    """Synthetic receipts exercise the verifier; no fixture or Docker is executed."""
+    from helpers import initial_investigation
+    from test_assessment import OfflineEvidence, fixture_member
     monkeypatch.setattr("audit3.executor.shutil.which", lambda _: None)
-    store, m = make_run()
+    source = b'def transform(base, value):\n    return base - abs(value)\n'
+    store, m = make_run({'app.py': source})
+    evidence, findings, certificates = OfflineEvidence(), {}, []
+    for role, eid, args, expected, observed, control in (
+        ('auditor', '1' * 24, [100, -20], 120, 80, ([100, 20], 80)),
+        ('defensor', '2' * 24, [250, -35], 285, 215, ([250, 35], 215))):
+        fid = role + '-refund'
+        _, proof, _ = fixture_member(evidence, source, fid, eid, args, expected, observed,
+            control, ['right'], 'value', 'value < 0')
+        bundle = evidence.bundles[eid]
+        script = bundle['test']['script'].replace('from unit_module import', 'from app import')
+        receipt = EvidenceReceipt(**{**bundle['receipt'], 'source_id': m.source_id,
+            'run_id': m.run_id, 'owner': role, 'phase': 'initial-0000', 'profile_hash': m.profile_hash,
+            'fingerprint': 'synthetic-only', 'command': ['MOCK', 'no-execution'], 'image_ids': {},
+            'versions': {'fixture': 'synthetic-receipt-contract'}, 'started_at': now(), 'finished_at': now(),
+            'exit_code': 1, 'script_sha256': digest(script.encode()),
+            'purpose': 'Explicit MOCK receipt for causal verifier regression', 'limitations': []})
+        store.put(m.run_id, 'receipts/' + eid, receipt)
+        store.put(m.run_id, 'tests/' + eid, {'script': script})
+        ref = SourceRef(path='app.py', start=1, end=2, sha256=digest(source))
+        findings[role] = finding(m, id=fid, refs=[ref], evidence_ids=[eid], proof_method='executed',
+            mechanism='negative input loses its sign under abs', invariant='subtract the signed input')
+        certificates.append({**proof, 'ref': ref.model_dump(mode='json'),
+            'finding_hash': object_hash(findings[role].model_dump(mode='json'))})
+    if certified:
+        store.put(m.run_id, 'assessment/causal-certificates', certificates)
+
     async def handler(role, phase, payload, tools, final):
         if phase.startswith("initial"):
-            tools.read_source("app.py")
-            return Opinion(summary="MOCK independent discovery", inspections=[], findings=[finding(m, id=role+"-refund")], positions=[], limitations=[])
+            opinion = initial_investigation(store, m, role)
+            opinion.findings = [findings[role]]
+            tools.read_evidence(findings[role].evidence_ids[0])
+            return opinion
         if final:
             tools.read_source("app.py")
-            return Judgment(summary="MOCK one mechanism", verdicts=[verdict("auditor-refund"), verdict("defensor-refund")], new_findings=[], limitations=[])
+            for f in findings.values(): tools.read_evidence(f.evidence_ids[0])
+            return Judgment(summary="MOCK one mechanism", verdicts=[
+                verdict(f.id, evidence_ids=f.evidence_ids, proof_method='executed')
+                for f in findings.values()], new_findings=[], limitations=[])
     state = asyncio.run(Workflow(store, m.run_id, runtime=MockRuntime(handler)).run())
     report = build_report(store, m.run_id)
+    assert {f['id'] for f in report['findings']} == {'auditor-refund', 'defensor-refund'}
+    assert report['state']['runtime_mode'] == 'mock'
+    if not certified:
+        assert state['status'] == 'partial' and not store.exists(m.run_id, 'judgment')
+        rejections = [store.get(m.run_id, 'roles/juiz/attempts/' + n)
+                      for n in store.names(m.run_id, 'roles/juiz/attempts') if n.endswith('-rejected')]
+        assert any('sem prova equivalente' in item['feedback'] for item in rejections)
+        return
     assert state["phase"] == "done", state
     assert len(report["verdicts"]) == 2
     assert report["metrics"]["unique_finding_ids"] == 2
     assert report["metrics"]["established_root_causes"] == 1
+    assert report['causal_validation']['valid']
+    assert len(report['proven_causal_groups']) == 1
+    assert len(report['proven_causal_groups'][0]['proofs']) == 2
+    assert store.path(m.run_id, 'source/app.py').read_bytes() == source
 
 
 def test_different_mechanisms_in_same_file_cannot_merge(make_run):

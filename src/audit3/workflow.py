@@ -19,12 +19,13 @@ from .tools import SourceTools, ToolContext
 from .causality import causal_groups
 from .completion import assess_completion, VERSION as ASSESSMENT_VERSION
 from .operational import total_seconds
+from .investigation import is_blind, validate_initial_output, validate_saved_initial, assess_independent_investigation
 
 
 def batches(manifest: RunManifest, line_limit: int):
     result, batch, size = [], [], 0
     for f in manifest.files:
-        if f.category in {"excluded", "prior_report"}:
+        if f.category in {"excluded", "prior_report"} or not f.lines:
             continue
         for start in range(1, max(1, f.lines) + 1, line_limit):
             end = min(f.lines, start + line_limit - 1)
@@ -106,6 +107,7 @@ class Workflow:
                     raise PolicyError("posição sobre achado inexistente")
                 for eid in position.evidence_ids:
                     tools.read_evidence(eid, record_access=False)
+            validate_initial_output(output, tools)
             return
         known = self.findings()
         if self.store.exists(self.run_id, "baseline"):
@@ -139,13 +141,24 @@ class Workflow:
         for finding in output.new_findings:
             tools.validate_finding(finding)
         certificate_name = 'assessment/causal-certificates'
-        certificates = self.store.get(self.run_id, certificate_name) if self.store.exists(self.run_id, certificate_name) else []
+        prepare_certificates = (self.store.exists(self.run_id, 'assessment/smoke-contract')
+            and tools.context.invocation_id != 'report-validation')
+        if prepare_certificates:
+            from .smoke_causality import certificates_for_smoke
+            candidates = [known[v.finding_id] for v in output.verdicts if v.classification == Classification.PROVEN]
+            certificates = certificates_for_smoke(self.store, self.manifest, candidates, tools)
+        else:
+            certificates = self.store.get(self.run_id, certificate_name) if self.store.exists(self.run_id, certificate_name) else []
         causal_groups(list(known.values()), [v.model_dump(mode='json') for v in output.verdicts],
             tools, tools.source_bytes_for_validation, certificates)
+        if prepare_certificates:
+            self.store.put(self.run_id, certificate_name, certificates, immutable=True)
 
     async def invoke(self, role: str, phase: str, assignment=None, final=False):
         name = f"roles/{role}/phases/{phase}"
         if self.store.exists(self.run_id, name):
+            if is_blind(phase):
+                validate_saved_initial(self.store, self.manifest, self.config, role, phase, assignment if isinstance(assignment, list) else None)
             return self.store.get(self.run_id, name)["output"]
         async with self.semaphore:
             if self.store.exists(self.run_id, "cancel"):
@@ -157,6 +170,14 @@ class Workflow:
                 "baseline_receipts": self.store.get(self.run_id, "baseline")["ids"],
                 "comparison_ids": self.store.names(self.run_id, "comparisons"),
                 "instruction": "Leia os intervalos atribuídos via ferramentas. Declare lacunas. Em debate retorne posições; final exige decisão por achado."}
+            if self.store.exists(self.run_id, "assessment/smoke-contract"):
+                from .smoke_causality import check_marker
+                marker = check_marker(self.store, self.manifest)
+                payload["smoke_evidence_instruction"] = {
+                    "receipt_id": marker["receipt_id"],
+                    "instruction": "Consulte os receipts de base pelas ferramentas. Se um achado usar essa evidência, "
+                        "cite seu ID e referências que cubram a função examinada inteira. Registre somente o que "
+                        "a fonte e as observações sustentam; nenhum achado é obrigatório."}
             if self.store.exists(self.run_id, "barrier"):
                 phase_input = f"phase-inputs/{phase}"
                 payload["published_opinions"] = self.store.get(self.run_id, phase_input) if self.store.exists(self.run_id, phase_input) else self.shared()
@@ -278,9 +299,15 @@ class Workflow:
                     task.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
                 raise
+            investigation = assess_independent_investigation(self.store, self.manifest)
+            if not investigation["valid"]:
+                raise PolicyError("; ".join(investigation["gaps"]))
             barrier = {"published_at": now(), "initial_hashes": {r.value: object_hash(self.store.get(self.run_id, f"roles/{r.value}/initial")) for r in Role}}
             self.store.put(self.run_id, "barrier", barrier, immutable=True)
             self.store.event(self.run_id, "barrier_published", barrier)
+        investigation = assess_independent_investigation(self.store, self.manifest)
+        if not investigation["valid"]:
+            raise PolicyError("; ".join(investigation["gaps"]))
         await self.paired("contest")
         await self.paired("reply")
         if not self.store.exists(self.run_id, "review-start"):
@@ -320,10 +347,14 @@ class Workflow:
 
     async def run(self, resume=False):
         with self.store.lock(self.run_id):
-            self.store.put(self.run_id, 'financial-policy', {'permanent': True, 'rule': financial_policy()}, immutable=True)
             state = self.state()
             if state["phase"] == "done":
+                investigation = assess_independent_investigation(self.store, self.manifest)
+                if not investigation["valid"]:
+                    raise PolicyError("Run encerrado com impedimento estrutural de investigação cega: "
+                        + "; ".join(investigation["gaps"]))
                 return state
+            self.store.put(self.run_id, 'financial-policy', {'permanent': True, 'rule': financial_policy()}, immutable=True)
             total_limit = total_seconds(self.store, self.run_id, self.config)
             if self.store.exists(self.run_id, "cancel"):
                 if not resume:

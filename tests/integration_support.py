@@ -78,15 +78,8 @@ def save_live_artifacts(store, manifest):
 def assert_real_process(store, manifest, report, events):
     """Acceptance requires observed SDK calls/tools and a completed factual baseline."""
     run_id = manifest.run_id
-    assert report["state"]["phase"] == "done", report["state"]
-    assert report["state"]["status"] == "completed", report["state"]
-    assert report['completion_assessment']['status'] == 'completed'
-    assert not report['completion_assessment']['blockers']
-    assert report['causal_validation']['valid'], report['causal_validation']['gaps']
-    assert report["state"]["runtime_mode"] == "codex-app-server"
-    assert not report["coverage"]["gaps"], report["coverage"]["gaps"]
-    baseline = [r for r in report["receipts"] if r["owner"] == "baseline"]
-    assert baseline and all(r["execution"] == "docker" and r["status"] == "failed" for r in baseline)
+    from audit3.acceptance import assert_scoped_completion
+    assert_scoped_completion(report)
     calls = report["usage"]["calls"]
     assert {c["role"] for c in calls if c["status"] == "completed"} == {"auditor", "defensor", "juiz"}
     barrier = store.get(run_id, "barrier")

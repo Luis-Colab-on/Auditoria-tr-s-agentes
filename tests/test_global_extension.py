@@ -25,17 +25,21 @@ def setup_extension(make_run):
     async def session():
         return await runtime.session('juiz', await runtime.preflight())
     thread = asyncio.run(session())
+    from helpers import initial_investigation
+    initial_opinions = {role: initial_investigation(store, m, role).model_dump(mode='json')
+                        for role in ('auditor', 'defensor', 'juiz')}
     opinion = Opinion(summary='MOCK completed phase', inspections=[], findings=[], positions=[], limitations=[]).model_dump(mode='json')
     prior_phases = set(protocol_phases(m, cfg)) - {'juiz/final'}
     hashes = {}
     for item in prior_phases:
         role, phase = item.split('/')
-        value = {'role': role, 'phase': phase, 'output': copy.deepcopy(opinion), 'published_at': now()}
+        output = initial_opinions[role] if phase.startswith('initial-') or phase == 'blind' else opinion
+        value = {'role': role, 'phase': phase, 'output': copy.deepcopy(output), 'published_at': now()}
         store.put(m.run_id, f'roles/{role}/phases/{phase}', value)
         hashes[item] = object_hash(value)
     initial = {}
     for role in ('auditor', 'defensor', 'juiz'):
-        value = {'role': role, 'opinions': [copy.deepcopy(opinion)]}
+        value = {'role': role, 'opinions': [copy.deepcopy(initial_opinions[role])]}
         store.put(m.run_id, f'roles/{role}/initial', value)
         initial[role] = object_hash(value)
     store.put(m.run_id, 'barrier', {'published_at': now(), 'initial_hashes': initial})
@@ -73,8 +77,8 @@ def test_extension_continues_only_final_and_preserves_all_old_calls_and_phases(m
         'config', 'manifest', 'roles/auditor/phases/initial-0000', 'roles/defensor/phases/initial-0000',
         'roles/juiz/phases/blind', 'roles/juiz/phases/review', 'roles/juiz/attempts/final-0', 'codex-turns/' + 'f' * 24)}
     original = rpc.request
-    async def request(method, params):
-        result = await original(method, params)
+    async def request(method, params, **kwargs):
+        result = await original(method, params, **kwargs)
         if method == 'turn/start':
             assert params['threadId'] == store.get(m.run_id, 'roles/juiz/codex-session')['thread_id']
             assert params['outputSchema']['title'] == 'Judgment'

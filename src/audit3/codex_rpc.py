@@ -3,13 +3,39 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 from .agents import RuntimePaused
 
 CLI_VERSION = "0.167.0"
 BACKEND = "codex-app-server"
 ALLOWED_METHODS = frozenset({'initialize', 'initialized', 'config/read', 'account/read',
     'model/list', 'account/rateLimits/read', 'thread/start', 'thread/resume', 'turn/start', 'turn/interrupt'})
+
+
+class DispatchExpired(TimeoutError):
+    """The new request was blocked before writing any bytes."""
+
+
+@dataclass
+class TurnDispatch:
+    deadline_at: float
+    deadline_origin: str
+    financial_guard: Callable[[], object]
+    write_attempted: bool = False
+    written: bool = False
+
+    def check(self):
+        # Recheck the factual wall-clock expiry as well as the immutable
+        # monotonic deadline. No persistence or serialization follows this check.
+        self.financial_guard()
+        if asyncio.get_running_loop().time() >= self.deadline_at:
+            raise DispatchExpired(self.deadline_origin)
+
+    @property
+    def status(self):
+        return 'written' if self.written else ('write_uncertain' if self.write_attempted else 'not_sent')
 
 
 def clean_environment(home: Path):
@@ -62,19 +88,29 @@ class StdioRPC:
                 self.events.get_nowait()
             self.events.put_nowait({"method": "audit3/transportLost"})
 
-    async def send(self, data):
+    async def send(self, data, *, dispatch=None):
         if 'method' in data and data['method'] not in ALLOWED_METHODS:
             raise RuntimePaused('RPC fora do escopo: operações de conta/faturamento e alternativas não autorizadas são bloqueadas')
-        self.proc.stdin.write((json.dumps(data, ensure_ascii=False) + "\n").encode())
+        if data.get('method') == 'turn/start' and not isinstance(dispatch, TurnDispatch):
+            raise RuntimePaused('turn/start exige proteção explícita de prazo no despacho')
+        wire = (json.dumps(data, ensure_ascii=False) + "\n").encode()
+        if dispatch is not None:
+            dispatch.check()
+            # Once write is attempted, an exception may mean a partial write.
+            # Only a guard/serialization failure proves that nothing was sent.
+            dispatch.write_attempted = True
+        self.proc.stdin.write(wire)
+        if dispatch is not None:
+            dispatch.written = True
         await self.proc.stdin.drain()
 
-    async def request(self, method, params):
+    async def request(self, method, params, *, dispatch=None):
         self.sequence += 1
         ident = self.sequence
         future = asyncio.get_running_loop().create_future()
         self.pending[ident] = future
         try:
-            await self.send({"id": ident, "method": method, "params": params})
+            await self.send({"id": ident, "method": method, "params": params}, dispatch=dispatch)
             return await asyncio.wait_for(future, self.timeout)
         finally:
             self.pending.pop(ident, None)

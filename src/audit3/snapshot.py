@@ -21,7 +21,9 @@ SECRET_NAMES = {".env", "wp-config.php", "id_rsa", "id_ed25519", "credentials", 
 
 
 def git(repo: Path, *args: str) -> bytes:
-    # No global config, hooks, external diff, filters, SSH agent or credential helper.
+    # No global config, hooks, fsmonitor, SSH agent or credential helper. Local
+    # config is still present: callers must use object plumbing, never worktree
+    # operations (even `status` can execute locally configured clean filters).
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/nonexistent", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_COUNT": "0", "GIT_NO_REPLACE_OBJECTS": "1"}
     result = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "credential.helper=", "-c", "protocol.file.allow=never", "-c", "protocol.ext.allow=never", "-c", "http.followRedirects=false", "-C", str(repo), *args], env=env, capture_output=True, timeout=120)
     if result.returncode:
@@ -48,23 +50,29 @@ def git_entries(repo: Path, ref: str, config: Config):
     raw = git(repo, "ls-tree", "-rlz", "--full-tree", sha)
     entries = []
     submodules = []
+    total = 0
     for item in raw.split(b"\x00"):
         if not item:
             continue
         meta, path = item.split(b"\t", 1)
         mode, kind, oid, size = meta.split()
         name = safe_relative(path.decode("utf-8"))
+        if len(entries) >= config.max_files:
+            raise PolicyError("inventário excede limites")
         if kind == b"commit":
             submodules.append(name + "@" + oid.decode())
             entries.append((name, b"", "submodule_not_materialized"))
-        elif mode == b"120000":
-            entries.append((name, git(repo, "cat-file", "blob", oid.decode()), "symlink_excluded"))
-        elif int(size) > config.max_file_bytes:
-            raise PolicyError("arquivo excede limite; ajuste escopo explicitamente")
         else:
-            entries.append((name, git(repo, "cat-file", "blob", oid.decode()), None))
-        if len(entries) > config.max_files or sum(len(x[1]) for x in entries) > config.max_total_bytes:
-            raise PolicyError("inventário excede limites")
+            # Check every blob, including excluded links, before materializing it.
+            if int(size) > config.max_file_bytes:
+                raise PolicyError("arquivo excede limite; ajuste escopo explicitamente")
+            total += int(size)
+            if total > config.max_total_bytes:
+                raise PolicyError("inventário excede limites")
+            data = git(repo, "cat-file", "blob", oid.decode())
+            if len(data) != int(size):
+                raise PolicyError("tamanho do blob inconsistente")
+            entries.append((name, data, "symlink_excluded" if mode == b"120000" else None))
     try:
         origin = git(repo, "config", "--local", "--get", "remote.origin.url").decode().strip()
         # Origins can embed tokens, usernames, or local private paths.
@@ -72,7 +80,9 @@ def git_entries(repo: Path, ref: str, config: Config):
     except PolicyError:
         origin = None
     bare = git(repo, "rev-parse", "--is-bare-repository").decode().strip() == "true"
-    state = "bare" if bare else ("dirty_preserved_not_included" if git(repo, "status", "--porcelain", "--untracked-files=normal") else "clean")
+    # Inspect only the explicit commit. Worktree/index inspection can run code
+    # from received local configuration; untouched is not evidence of clean.
+    state = "bare" if bare else "worktree_not_inspected_commit_only"
     return entries, sha, origin, state, submodules
 
 

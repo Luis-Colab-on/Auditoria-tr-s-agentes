@@ -1,0 +1,10 @@
+{
+  "python-smoke-v1": {
+    "files": {
+      "README.md": "4cadb0447b82d980249faf86bf589e8efa61745a43626a7de55aa0a05b77ff3f",
+      "app.py": "3df54d2d3581e067328bed08d8c1bf019b02961e85f9ab86a10ba0510e5638db",
+      "tests/test_app.py": "789d21dcb2d78827fdc4fcbb6f4011d680d23b6d92552b8114a66e2de1260a68"
+    },
+    "objective": "Smoke da integração: execute pelo menos uma reprodução pertinente via submit_test; não force achados nem altere a fonte."
+  }
+}

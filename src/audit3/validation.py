@@ -149,6 +149,20 @@ def main(argv=None):
         "codex_smoke_requested": args.codex, "cases": cases, "counts": counts, "codex_turns_recorded": len(calls),
         "observed_estimated_cost_usd": cost, "cost_basis": "Pro: sem conversão por tarifa API; null = desconhecido",
         "scope": "somente fixtures sintéticas; FAEPA excluído", "operational_with_three_agents": all(case["status"] == "passed" for case in cases) and exit_code == 0}
+    smoke_report = artifact_dir / 'three-agents-report.json'
+    smoke_acceptance = artifact_dir / 'three-agents-acceptance.json'
+    summary['smoke_completion'] = {'raw_status': None, 'reviewed_status': None,
+        'review_id': None, 'blockers': [], 'acceptance': 'not_executed'}
+    if smoke_report.exists():
+        report = json.loads(smoke_report.read_text())
+        assessment = report.get('completion_assessment', {})
+        summary['smoke_completion'].update(raw_status=report['state']['status'],
+            reviewed_status=assessment.get('status'), review_id=assessment.get('review_id'),
+            blockers=assessment.get('blockers', []), acceptance='pending')
+        if smoke_acceptance.exists():
+            accepted = json.loads(smoke_acceptance.read_text())
+            if accepted.get('review_id') == assessment.get('review_id'):
+                summary['smoke_completion']['acceptance'] = accepted['status']
     if browser_first is not None:
         summary["browser_first"] = browser_first
     write_json(session / "results.json", summary)

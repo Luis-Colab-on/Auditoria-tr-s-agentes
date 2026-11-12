@@ -6,7 +6,7 @@ import json
 from importlib.resources import files
 from types import SimpleNamespace
 from .agents import AmbiguousTurn, Budget, BudgetExceeded, RuntimePaused
-from .codex_rpc import BACKEND, CLI_VERSION, StdioRPC
+from .codex_rpc import BACKEND, CLI_VERSION, StdioRPC, TurnDispatch, DispatchExpired
 from .codex_policy import (account_identity, check_effective_config, executable, financial_check, financial_policy, financial_remaining,
                            select_effort, setup_home, verify_client)
 from .schemas import Judgment, Opinion, TestRequest
@@ -193,6 +193,8 @@ class CodexRuntime:
                         observed = record.get('usage')
                         await self.budget.finish(entry['id'], SimpleNamespace(**observed) if observed else None)
                     return record['output']
+                if record['status'] == 'not_sent':
+                    raise RuntimePaused('Turno não enviado; reserva preservada; não repetir automaticamente')
                 raise AmbiguousTurn('Turno interrompido/ambíguo: não repetir automaticamente; revisão explícita dos artefatos necessária')
             turn_limit = turn_timeout(self.store, self.run_id, self.config)
             total_limit = total_seconds(self.store, self.run_id, self.config, role, phase)
@@ -215,18 +217,21 @@ class CodexRuntime:
                     and prior.get('status') in {'completed', 'ambiguous'}
                     and isinstance(prior.get('turn_id'), str) and prior['turn_id']):
                     prior_turn_ids.add(prior['turn_id'])
+            financial_anchor = loop.time()
             remaining = financial_remaining(effective['financial']['checked_at'])
             financial_context = {'verification_source': 'controller_preflight', 'verified_at': now(),
                 'authentication': effective['authentication'], 'planType': effective['plan'],
                 **effective['financial'], 'auto_recharge': 'disabled', 'extra_credits': 'none',
                 'remaining_valid_seconds': remaining, 'additional_spending_authorized': False}
             turn_payload = {**payload, 'financial_context': financial_context}
-            financial_deadline = loop.time() + remaining
+            financial_deadline = financial_anchor + remaining
             if global_deadline <= loop.time():
                 raise BudgetExceeded('limite de tempo total acumulado atingido')
             started_monotonic = loop.time()
             deadline_origin, deadline_at = min((('turn_deadline', started_monotonic + turn_limit),
                 ('global_deadline', global_deadline), ('financial_deadline', financial_deadline)), key=lambda item: item[1])
+            dispatch = TurnDispatch(deadline_at, deadline_origin,
+                lambda: financial_remaining(effective['financial']['checked_at']))
             cid = await self.budget.reserve(role, tools.context.invocation_id)
             record = {'call_id': cid, 'status': 'sending', 'role': role, 'phase': phase, 'thread_id': thread_id,
                 'input_hash': object_hash(payload), 'wire_input_hash': object_hash(turn_payload),
@@ -249,9 +254,9 @@ class CodexRuntime:
                     response = await self.rpc.request('turn/start', {'threadId': thread_id,
                         'input': [{'type': 'text', 'text': json.dumps(turn_payload, ensure_ascii=False)}],
                         'model': effective['model'], 'effort': effective['effort'], 'serviceTierForTurn': 'default',
-                        'environments': [], 'outputSchema': output_schema(Judgment if final else Opinion)})
+                        'environments': [], 'outputSchema': output_schema(Judgment if final else Opinion)}, dispatch=dispatch)
                     turn_id = response['turn']['id']
-                    record.update(status='running', turn_id=turn_id)
+                    record.update(status='running', turn_id=turn_id, dispatch_status=dispatch.status)
                     self.store.put(self.run_id, checkpoint, record)
                     output, steps = None, 0
                     while True:
@@ -314,21 +319,22 @@ class CodexRuntime:
                 # Only observable final answer persists. No raw frames/reasoning/history.
                 record.update(status='completed', output=output, finished_at=now(), usage=vars(usage) if usage else None)
                 self.store.put(self.run_id, checkpoint, record)
-                await self.budget.finish(cid, usage)
+                await self.budget.finish(cid, usage, dispatch_status=dispatch.status)
                 self.store.event(self.run_id, 'runner_completed', {'role': role, 'phase': phase,
                     'invocation_id': tools.context.invocation_id, 'output_hash': object_hash(output)})
                 return output
             except BaseException as exc:
-                record.update(status='ambiguous', error_type=type(exc).__name__)
+                record.update(status='ambiguous' if dispatch.write_attempted else 'not_sent',
+                    dispatch_status=dispatch.status, error_type=type(exc).__name__)
                 if isinstance(exc, TimeoutError):
-                    origin = deadline_origin if deadline.expired() else ('rpc_timeout' if operation.startswith('rpc:') else 'operation_timeout')
+                    origin = deadline_origin if deadline.expired() or isinstance(exc, DispatchExpired) else ('rpc_timeout' if operation.startswith('rpc:') else 'operation_timeout')
                     record['timeout'] = {'origin': origin, 'operation': operation,
                         'turn_limit_seconds': turn_limit,
                         'rpc_limit_seconds': getattr(self.rpc, 'timeout', 20),
                         'elapsed_monotonic_seconds': loop.time() - started_monotonic,
                         'last_event': last_event, 'last_event_at': last_event_at}
                 self.store.put(self.run_id, checkpoint, record)
-                await self.budget.finish(cid, error=type(exc).__name__)
+                await self.budget.finish(cid, error=type(exc).__name__, dispatch_status=dispatch.status)
                 if turn_id:
                     try:
                         await self.rpc.request('turn/interrupt', {'threadId': thread_id, 'turnId': turn_id})
@@ -336,8 +342,9 @@ class CodexRuntime:
                         pass
                 # Close transport so a paused turn cannot keep invoking tools.
                 await self.close()
-                if isinstance(exc, TimeoutError) and deadline.expired() and financial_timeout:
-                    raise RuntimePaused('Verificação financeira expirou durante o turno; progresso salvo, sem retry ou alternativa paga') from None
+                if isinstance(exc, TimeoutError) and (deadline.expired() or isinstance(exc, DispatchExpired)) and financial_timeout:
+                    when = 'durante o turno' if dispatch.write_attempted else 'antes do envio'
+                    raise RuntimePaused(f'Verificação financeira expirou {when}; progresso salvo, sem retry ou alternativa paga') from None
                 if isinstance(exc, TimeoutError):
                     raise RuntimePaused(f'Timeout em {role}/{phase}: {record["timeout"]["origin"]}; aguardando {operation}; limite do turno {turn_limit}s; checkpoint preservado') from None
                 raise

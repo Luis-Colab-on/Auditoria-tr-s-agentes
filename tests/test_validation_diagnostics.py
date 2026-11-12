@@ -50,15 +50,31 @@ def test_spend_controls_require_finite_amounts():
             Config(input_usd_per_million=value)
 
 
-def test_full_live_acceptance_rejects_mock_or_unexecuted_baseline():
+@pytest.mark.parametrize('failure', ['mock', 'legacy', 'baseline'])
+def test_full_live_acceptance_rejects_mock_or_unexecuted_baseline(failure):
     from integration_support import assert_real_process
-    report = {"state": {"phase": "done", "status": "completed", "runtime_mode": "mock"}}
-    with pytest.raises(AssertionError):
-        assert_real_process(None, SimpleNamespace(run_id="fixture"), report, [])
-    report["state"]["runtime_mode"] = "openai-agents"
-    report.update(coverage={"gaps": []}, receipts=[{"owner": "baseline", "execution": "not_executed", "status": "blocked"}])
-    with pytest.raises(AssertionError):
-        assert_real_process(None, SimpleNamespace(run_id="fixture"), report, [])
+    from test_assessment import completion_fixture
+    from audit3.scope_review import make_review
+    from audit3.completion import assess_completion
+    report = completion_fixture()
+    if failure == 'mock': report['state']['runtime_mode'] = 'mock'
+    if failure == 'legacy': report['manifest']['backend'] = 'openai-agents'
+    if failure == 'baseline':
+        report['receipts'][0].update(execution='not_executed', status='blocked')
+        # No scope notes: this case reaches the independent baseline guard.
+        report['manifest']['limitations'] = []
+        report['state']['status'] = 'completed'
+    report['completion_review'] = make_review(report)
+    report['completion_assessment'] = assess_completion(report, report['completion_review'])
+    expected = {'mock': 'Backend mock', 'legacy': 'Backend incompatível', 'baseline': 'Baseline não executado'}
+    with pytest.raises(AssertionError, match=expected[failure]):
+        assert_real_process(None, SimpleNamespace(run_id='fixture'), report, [])
+
+
+def test_malformed_acceptance_report_has_specific_diagnostic():
+    from integration_support import assert_real_process
+    with pytest.raises(AssertionError, match='Relatório malformado'):
+        assert_real_process(None, SimpleNamespace(run_id='fixture'), {'state': {}}, [])
 
 
 def test_junit_skips_and_absent_tests_are_not_success(tmp_path):

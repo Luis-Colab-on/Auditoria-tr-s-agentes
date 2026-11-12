@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 import shutil
+import signal
 import tempfile
 from pathlib import Path
 from .config import Config, Profile
@@ -15,40 +16,105 @@ from .snapshot import verify_source
 
 
 class ProcessResult:
-    def __init__(self, code, stdout, stderr, out_hash, err_hash, truncated, timeout=False):
+    def __init__(self, code, stdout, stderr, out_hash, err_hash, truncated, timeout=False,
+                 output_complete=True, execution_seconds=0.0, cleanup_seconds=0.0):
         self.code, self.stdout, self.stderr = code, stdout, stderr
         self.out_hash, self.err_hash, self.truncated, self.timeout = out_hash, err_hash, truncated, timeout
+        self.output_complete = output_complete
+        self.execution_seconds, self.cleanup_seconds = execution_seconds, cleanup_seconds
+
+
+PROCESS_CLEANUP_SECONDS = 0.25
 
 
 async def process(argv: list[str], timeout: float, limit: int = 64000) -> ProcessResult:
-    """Only controller-built argv. Never shell; no inherited authentication or Docker context."""
+    """Trusted controller argv; execution + pipe drainage share the timeout.
+
+    A separate, bounded cleanup allowance kills the dedicated POSIX process group.
+    Hashes cover all bytes actually drained (including bytes beyond retention).
+    If pipes cannot reach EOF during cleanup, output_complete is false and hashes
+    describe only the observed prefix; output_truncated also remains true.
+    """
+    if os.name != "posix":
+        raise PolicyError("encerramento de subprocessos requer sessão POSIX exclusiva")
+    loop = asyncio.get_running_loop()
+    started = loop.time()
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/nonexistent", "LANG": "C.UTF-8"}
-    proc = await asyncio.create_subprocess_exec(*argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env)
-    async def drain(stream):
-        sha = hashlib.sha256()
-        buffer = bytearray()
-        size = 0
+    proc = await asyncio.create_subprocess_exec(*argv, stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE, env=env, start_new_session=True)
+    captures = [{"hash": hashlib.sha256(), "buffer": bytearray(), "size": 0, "complete": False} for _ in range(2)]
+
+    async def drain(stream, capture):
         while data := await stream.read(8192):
-            sha.update(data)
-            size += len(data)
-            buffer.extend(data[:max(0, limit - len(buffer))])
-        return redact(buffer.decode(errors="replace")), sha.hexdigest(), size > limit
-    out_task, err_task = asyncio.create_task(drain(proc.stdout)), asyncio.create_task(drain(proc.stderr))
+            capture["hash"].update(data)
+            capture["size"] += len(data)
+            capture["buffer"].extend(data[:max(0, limit - len(capture["buffer"]))])
+        capture["complete"] = True
+
+    tasks = [asyncio.create_task(proc.wait()), asyncio.create_task(drain(proc.stdout, captures[0])),
+             asyncio.create_task(drain(proc.stderr, captures[1]))]
+
+    def kill_group():
+        # start_new_session guarantees pgid == child pid, never controller pgid.
+        # Kill even after the parent exits: descendants may still hold pipes.
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    async def cleanup():
+        kill_group()
+        _, pending = await asyncio.wait(tasks, timeout=PROCESS_CLEANUP_SECONDS)
+        if pending:
+            # asyncio.Process offers no public operation to close inherited pipes.
+            # Closing its transport detaches stuck descriptors before cancellation.
+            proc._transport.close()
+            for task in pending:
+                task.cancel()
+        # Only local drain/proc.wait tasks remain; cancellation does not run any
+        # user callbacks or wait for a descendant's EOF.
+        await asyncio.gather(*tasks, return_exceptions=True)
+
     timed_out = False
+    cleanup_seconds = 0.0
     try:
-        await asyncio.wait_for(proc.wait(), timeout)
-    except asyncio.TimeoutError:
-        timed_out = True
-        proc.kill()
-        await proc.wait()
+        _, pending = await asyncio.wait(tasks, timeout=max(0.0, started + timeout - loop.time()))
+        execution_seconds = loop.time() - started
+        timed_out = bool(pending)
+        if not pending:
+            for task in tasks:
+                task.result()
     except BaseException:
-        if proc.returncode is None:
-            proc.kill()
-        await proc.wait()
-        await asyncio.gather(out_task, err_task)
+        # Shield cleanup against further cancellation while preserving the
+        # original cancellation/error and ensuring no background tasks survive.
+        cleanup_task = asyncio.create_task(cleanup())
+        while not cleanup_task.done():
+            try:
+                await asyncio.shield(cleanup_task)
+            except asyncio.CancelledError:
+                continue
+        cleanup_task.result()
         raise
-    out, err = await asyncio.gather(out_task, err_task)
-    return ProcessResult(proc.returncode, out[0], err[0], out[1], err[1], out[2] or err[2], timed_out)
+    if timed_out:
+        cleanup_started = loop.time()
+        cleanup_task = asyncio.create_task(cleanup())
+        try:
+            await asyncio.shield(cleanup_task)
+        except asyncio.CancelledError:
+            while not cleanup_task.done():
+                try:
+                    await asyncio.shield(cleanup_task)
+                except asyncio.CancelledError:
+                    continue
+            cleanup_task.result()
+            raise
+        cleanup_seconds = loop.time() - cleanup_started
+    out, err = captures
+    complete = all(c["complete"] for c in captures)
+    return ProcessResult(proc.returncode, redact(out["buffer"].decode(errors="replace")),
+        redact(err["buffer"].decode(errors="replace")), out["hash"].hexdigest(), err["hash"].hexdigest(),
+        not complete or any(c["size"] > limit for c in captures), timed_out,
+        complete, execution_seconds, cleanup_seconds)
 
 
 def validate_image(image: str):
@@ -199,6 +265,11 @@ class Executor:
                         cleanup = await asyncio.shield(process(["docker", "rm", "--force", name], 20))
                         if cleanup.code:
                             raise PolicyError("remoção do container não confirmada: " + name)
+            if result.timeout:
+                limitations.append(f"Timeout do subprocesso: execução observada {result.execution_seconds:.3f}s; "
+                    f"encerramento {result.cleanup_seconds:.3f}s (tolerância de drenagem {PROCESS_CLEANUP_SECONDS:.2f}s).")
+            if not result.output_complete:
+                limitations.append("Drenagem não atingiu EOF no prazo de encerramento; hashes cobrem somente os bytes observados.")
             status = "passed" if result.code == 0 and not result.timeout else "failed"
         except asyncio.CancelledError:
             status, cancelled = "cancelled", True

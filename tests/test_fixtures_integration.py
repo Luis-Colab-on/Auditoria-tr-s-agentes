@@ -56,17 +56,27 @@ def test_three_real_agents_small_fixture(tmp_path):
     runtime.home = home.absolute()
     store.put(m.run_id, "financial-confirmation", json.loads(Path(os.environ["AUDIT3_FINANCIAL_CONFIRMATION"]).read_text()))
     try:
-        baseline = asyncio.run(Executor(store, m, cfg, Profile(name="synthetic")).execute(
-            Request(kind="baseline", purpose="testes de base factuais do snapshot"), "baseline", "baseline"))
-        store.put(m.run_id, "baseline", {"ids": [baseline.id]}, immutable=True)
-        assert baseline.status == "failed" and baseline.execution == "docker", baseline.model_dump()
+        from audit3.smoke_causality import prepare_smoke_evidence
+        asyncio.run(prepare_smoke_evidence(store, m, cfg, Executor(store, m, cfg, Profile(name="synthetic"))))
         asyncio.run(Workflow(store, m.run_id, runtime=runtime).run())
     finally:
+        from audit3.report import build_report
+        from audit3.scope_review import make_review
+        raw_report = build_report(store, m.run_id, use_review=False)
+        store.put(m.run_id, 'assessment/completion-review', make_review(raw_report), immutable=True)
         report, events = save_live_artifacts(store, m)
     assert_real_process(store, m, report, events)
     # One known mechanism; a protected helper must not create a second defect.
     from audit3.acceptance import assert_known_cause
     assert_known_cause(report, {'path': 'app.py', 'start': 4, 'end': 4})
+    from audit3.completion import context_hash
+    acceptance = {'status': 'passed', 'raw_status': report['state']['status'], 'context_hash': context_hash(report),
+        'review_id': report['completion_assessment']['review_id']}
+    store.put(m.run_id, 'assessment/smoke-acceptance', acceptance, immutable=True)
+    save_live_artifacts(store, m)
+    path = artifacts_path('three-agents-acceptance.json')
+    if path:
+        write_json(path, acceptance)
     # This validates the integration only; it does not estimate general quality.
 
 

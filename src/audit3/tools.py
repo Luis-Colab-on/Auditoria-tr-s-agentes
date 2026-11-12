@@ -17,11 +17,12 @@ class ToolContext:
 
 
 class SourceTools:
-    def __init__(self, store: Store, manifest: RunManifest, config: Config, executor: Executor, context: ToolContext):
+    def __init__(self, store: Store, manifest: RunManifest, config: Config, executor: Executor, context: ToolContext, *, read_before: str | None = None):
         if context.run_id != manifest.run_id or context.role not in {"auditor", "defensor", "juiz"}:
             raise PolicyError("identidade inválida")
         self.store, self.manifest, self.config, self.executor, self.context = store, manifest, config, executor, context
         self.index = {f.path: f for f in manifest.files}
+        self.read_before = read_before
 
     def check(self):
         if self.store.exists(self.context.run_id, "cancel"):
@@ -47,7 +48,7 @@ class SourceTools:
         return True
 
     def log(self, tool: str, data: dict):
-        self.store.event(self.context.run_id, "tool", {"role": self.context.role, "phase": self.context.phase, "invocation_id": self.context.invocation_id, "tool": tool, **data})
+        self.store.event(self.context.run_id, "tool", {"run_id": self.context.run_id, "source_id": self.manifest.source_id, "before_barrier": not self.store.exists(self.context.run_id, "barrier"), "role": self.context.role, "phase": self.context.phase, "invocation_id": self.context.invocation_id, "tool": tool, **data})
 
     def list_source(self, offset: int = 0, limit: int = 100):
         self.check()
@@ -142,25 +143,61 @@ class SourceTools:
         self.log("submit_test", {"id": receipt.id, "status": receipt.status})
         return receipt.model_dump()
 
+    def source_read_events(self):
+        """Authenticated reads, bound to the role, snapshot and investigation stage.
+
+        Older records are already bound to their run by Store's authenticated envelope;
+        their file hash is required. Missing historical phase/cutoff proof fails closed.
+        """
+        blind = self.context.phase.startswith("initial") or self.context.phase == "blind"
+        cutoff = self.read_before
+        if blind and self.store.exists(self.context.run_id, "barrier"):
+            published_at = self.store.get(self.context.run_id, "barrier").get("published_at")
+            if not published_at:
+                return
+            cutoff = min(cutoff, published_at) if cutoff else published_at
+        for name in self.store.names(self.context.run_id, "events"):
+            event = self.store.get(self.context.run_id, "events/" + name)
+            d = event["data"]
+            f = self.index.get(d.get("path"))
+            if (event["kind"] != "tool" or d.get("tool") != "read_source"
+                or d.get("role") != self.context.role or not f
+                or d.get("run_id", self.context.run_id) != self.context.run_id
+                or d.get("source_id", self.manifest.source_id) != self.manifest.source_id
+                or d.get("sha256") != f.sha256 or f.category in {"excluded", "prior_report"}
+                or not isinstance(d.get("start"), int) or not isinstance(d.get("end"), int)
+                or not 1 <= d["start"] <= d["end"] <= f.lines):
+                continue
+            if cutoff and (not event.get("at") or event["at"] > cutoff):
+                continue
+            if blind:
+                phase = d.get("phase", "")
+                if d.get("before_barrier") is False:
+                    continue
+                if self.context.role == "juiz":
+                    if phase != "blind":
+                        continue
+                elif not phase.startswith("initial"):
+                    continue
+            yield event
+
     def validate_ref(self, ref: SourceRef, require_read=True):
         f = self.index.get(ref.path)
-        if not f or f.category == "excluded" or f.sha256 != ref.sha256 or ref.end > f.lines:
+        if not f or f.category in {"excluded", "prior_report"} or f.sha256 != ref.sha256 or ref.end > f.lines:
             raise PolicyError("referência de código inválida")
         if require_read:
-            intervals = []
-            for n in self.store.names(self.context.run_id, "events"):
-                event = self.store.get(self.context.run_id, "events/" + n)
-                d = event["data"]
-                if event["kind"] == "tool" and d.get("role") == self.context.role and d.get("tool") == "read_source" and d.get("path") == ref.path:
-                    intervals.append((d["start"], d["end"]))
+            intervals = [(event["data"]["start"], event["data"]["end"])
+                         for event in self.source_read_events() if event["data"]["path"] == ref.path]
             cursor = ref.start
             for start, end in sorted(intervals):
                 if start <= cursor:
                     cursor = max(cursor, end + 1)
             if cursor <= ref.end:
-                raise PolicyError("referência não foi devolvida pelas ferramentas ao papel")
+                raise PolicyError("referência não foi devolvida pelas ferramentas ao papel na etapa exigida")
 
     def validate_inspection(self, inspection: InspectionRecord):
+        if not inspection.requirement.strip() or not inspection.analysis.strip():
+            raise PolicyError("inspeção sem requisito/invariante e análise próprios")
         if not inspection.refs:
             raise PolicyError("análise sem referências")
         for ref in inspection.refs:

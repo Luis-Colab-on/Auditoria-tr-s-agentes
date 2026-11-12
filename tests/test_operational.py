@@ -65,12 +65,20 @@ def test_non_deadline_failure_does_not_justify_longer_turn(make_run):
         turn_timeout(store, m.run_id, runtime.config)
 
 
-def test_amended_timeout_still_expires_at_global_deadline(make_run):
+def test_amended_timeout_still_expires_at_global_deadline(make_run, monkeypatch):
     store, m, runtime, rpc, tools = rig(make_run)
     authorize(store, m)
     rpc.mode = 'timeout'
     async def exercise():
-        runtime.global_deadline = asyncio.get_running_loop().time() + 0.05
+        loop = asyncio.get_running_loop()
+        clock = [loop.time()]
+        monkeypatch.setattr(loop, 'time', lambda: clock[0])
+        original_get = rpc.events.get
+        async def expire_after_dispatch():
+            clock[0] += .1
+            return await original_get()
+        monkeypatch.setattr(rpc.events, 'get', expire_after_dispatch)
+        runtime.global_deadline = loop.time() + 0.05
         with pytest.raises(RuntimePaused, match='global_deadline'):
             await runtime.invoke('auditor', 'initial-0000', {}, tools)
     asyncio.run(exercise())
@@ -116,6 +124,8 @@ def test_amendment_uses_only_existing_recovery_slot(make_run):
                         'input_tokens': None, 'output_tokens': None}], 'tokens': None,
               'known_cost_usd': None, 'unknown_cost_calls': 1}
     store.put(m.run_id, 'ledger', ledger)
+    from helpers import initial_investigation
+    rpc.output = initial_investigation(store, m, 'auditor').model_dump_json()
     workflow = Workflow(store, m.run_id, runtime=runtime)
     asyncio.run(workflow.invoke('auditor', 'initial-0000'))
     count = len(store.get(m.run_id, 'ledger')['calls'])

@@ -130,3 +130,11 @@ No terminal normal WSL, sem reconstruir imagens existentes:
 Falta de Docker é `not_executed`, não aprovação. O smoke real só pode ser iniciado
 após os fatos financeiros documentados. A falha histórica do browser exige ambiente
 capaz de executar o sandbox Chromium; não se remove sandbox para fazê-la passar.
+
+## Correções do controlador e avaliação separada
+
+Consulte [correções e validação local](correcoes-validacao-local.md) para os
+requisitos de investigação cega, revisão de conclusão vinculada às evidências,
+preparação causal do smoke Python e comandos reproduzíveis. O estado bruto de
+runs anteriores permanece preservado. `review-completion ID --output ARQUIVO_NOVO`
+avalia offline em um artefato separado; não retoma agentes nem altera o run.

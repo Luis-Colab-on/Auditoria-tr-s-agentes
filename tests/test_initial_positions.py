@@ -88,7 +88,8 @@ def test_own_previous_initial_finding_remains_available(saved_response_context):
     store.put(manifest.run_id, 'roles/defensor/phases/initial-0000', {
         'output': output.model_dump(mode='json')})
     output.findings = []
-    tools = tools_for(store, manifest, 'defensor', 'initial-0001')
+    # This small fixture has one assigned batch; exercise recovery of that batch.
+    tools = tools_for(store, manifest, 'defensor', 'initial-0000')
     Workflow(store, manifest.run_id).validate_output(output, tools, final=False)
 
 

@@ -1,7 +1,7 @@
 """Versioned scoped completion. Narrative uncertainty is never silently dropped."""
 from .security import object_hash, PolicyError
 
-VERSION = 'scoped-assessment-2'
+VERSION = 'scoped-assessment-3'
 
 
 def pointer(document, path):
@@ -13,9 +13,11 @@ def pointer(document, path):
 
 
 def context_hash(report):
-    return object_hash({**{k: report.get(k) for k in ('manifest', 'coverage', 'opinions', 'judgment',
-        'causal_validation', 'proven_causal_groups', 'required_phases')},
-        'completed_phases': report['state']['completed']})
+    # Bind every factual input, including receipts/streams, dispatch accounting,
+    # final responses and operational interruptions. Derived review is excluded.
+    return object_hash({k: report.get(k) for k in ('manifest', 'coverage', 'opinions',
+        'judgment', 'causal_validation', 'proven_causal_groups', 'required_phases',
+        'state', 'receipts', 'usage', 'runtime', 'structural_checks', 'findings', 'verdicts', 'comparisons')})
 
 
 def limitation_messages(report):
@@ -34,8 +36,8 @@ def limitation_messages(report):
         elif isinstance(value, list):
             for index, child in enumerate(value):
                 visit(child, path + '/' + str(index))
-    for key in ('manifest', 'opinions', 'judgment'):
-        visit(report[key], '/' + key)
+    for key in ('manifest', 'opinions', 'judgment', 'state', 'receipts'):
+        visit(report.get(key, {}), '/' + key)
     return found
 
 
@@ -67,10 +69,23 @@ def assess_completion(report, review=None, required=None):
     if review and (review.get('version') != VERSION or review.get('context_hash') != context_hash(report)
                    or review.get('objective') != report['manifest']['requirements']):
         raise PolicyError('Revisão de limitações não corresponde ao objetivo/evidências')
+    if review and review.get('id') != object_hash({k: v for k, v in review.items() if k != 'id'}):
+        raise PolicyError('Identificação da revisão inválida')
     annotations = review.get('messages', {})
     if set(annotations) - set(messages):
         raise PolicyError('Revisão contém mensagem inexistente')
     blockers = [{'kind': 'coverage_gap', 'text': text} for text in report['coverage']['gaps']]
+    independent = report['coverage'].get('independent_investigation')
+    if not independent or not independent.get('valid'):
+        blockers.append({'kind': 'independent_investigation', 'text': 'Investigação cega não comprovada'})
+    checks = report.get('structural_checks', {})
+    for key in ('source_integrity', 'final_validation', 'limits_valid'):
+        if checks.get(key) is not True:
+            blockers.append({'kind': key, 'text': checks.get(key + '_error', key + ' não demonstrado')})
+    if report.get('causal_validation', {}).get('valid') is not True:
+        blockers.append({'kind': 'causality', 'text': 'Validação causal ausente/inválida'})
+    if report['state'].get('status') in {'blocked', 'cancelled', 'failed'}:
+        blockers.append({'kind': 'operational', 'text': 'Execução interrompida/bloqueada'})
     saved = {role + '/' + record['phase'] for role, records in report['opinions'].items() for record in records}
     missing = sorted(set(required or required_phases(report)) - (set(report['state']['completed']) & saved))
     blockers += [{'kind': 'pending_phase', 'text': phase} for phase in missing]
@@ -84,7 +99,7 @@ def assess_completion(report, review=None, required=None):
         entry = {'message_hash': key, **message, 'kind': 'unresolved',
                  'justification': 'Limitação ainda não classificada para este objetivo', 'evidence': []}
         if annotation:
-            if (set(annotation) - {'kind', 'justification', 'evidence'}
+            if (set(annotation) - {'kind', 'justification', 'evidence', 'policy', 'criterion'}
                 or annotation.get('kind') not in {'blocking', 'scope_note', 'procedure_note', 'unresolved'}
                 or not isinstance(annotation.get('justification'), str)
                 or not annotation['justification'].strip()
@@ -95,11 +110,21 @@ def assess_completion(report, review=None, required=None):
                     pointer(report, reference)
                 except (KeyError, IndexError, TypeError, ValueError):
                     raise PolicyError('Evidência da classificação de limitação não encontrada') from None
-            entry.update(annotation)
+            if annotation['kind'] in {'scope_note', 'procedure_note'}:
+                from .scope_review import validate_annotation
+                try:
+                    validate_annotation(report, message, annotation)
+                except PolicyError as exc:
+                    entry['justification'] = str(exc)
+                else:
+                    entry.update(annotation)
+            else:
+                entry.update(annotation)
         entries.append(entry)
         if entry['kind'] in {'blocking', 'unresolved'}:
             blockers.append({'kind': entry['kind'], 'message_hash': key, 'text': message['text']})
     return {'version': VERSION, 'objective': report['manifest']['requirements'],
-            'context_hash': context_hash(report), 'status': 'partial' if blockers else 'completed',
+            'context_hash': context_hash(report), 'review_id': review.get('id'),
+            'review_status': 'applied' if review else 'pending', 'status': 'partial' if blockers else 'completed',
             'blockers': blockers, 'limitations': entries,
             'interpretation': 'completed means scoped work concluded, not defect-free or production approval'}

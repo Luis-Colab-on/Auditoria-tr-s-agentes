@@ -80,7 +80,7 @@ def test_git_explicit_commit_preserves_dirty_tree(tmp_path):
     with pytest.raises(PolicyError):
         prepare(store, str(repo), None, Profile(name="generic"), Config())
     m = prepare(store, str(repo), sha, Profile(name="generic"), Config())
-    assert m.commit == sha and m.tree_state == "dirty_preserved_not_included"
+    assert m.commit == sha and m.tree_state == "worktree_not_inspected_commit_only"
     assert store.path(m.run_id, "source/app.py").read_text() == "value = 1\n"
     assert (repo / "app.py").read_text() == "value = 2\n"
     assert (repo / "untracked.py").exists()

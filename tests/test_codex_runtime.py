@@ -41,7 +41,10 @@ class FakeRPC:
         self.config['features'].pop('apps_mcp_path_override')
         self.closed = False
 
-    async def request(self, method, params):
+    async def request(self, method, params, *, dispatch=None):
+        if dispatch is not None:
+            dispatch.check()
+            dispatch.write_attempted = dispatch.written = True
         self.calls.append((method, params))
         if method == 'config/read': return {'config': self.config}
         if method == 'account/read': return {'account': self.account}
@@ -65,7 +68,7 @@ class FakeRPC:
             elif self.mode == 'approval': self.events.put_nowait({'id': 'server-approval', 'method': 'item/commandExecution/requestApproval', 'params': base})
             elif self.mode == 'wrong_thread': self.events.put_nowait({'method': 'turn/completed', 'params': {**base, 'threadId': 'other', 'turn': {'id': tid, 'status': 'completed'}}})
             elif self.mode != 'timeout':
-                output = Opinion(summary='MOCK contract result', inspections=[], findings=[], positions=[], limitations=[]).model_dump_json()
+                output = getattr(self, 'output', None) or Opinion(summary='MOCK contract result', inspections=[], findings=[], positions=[], limitations=[]).model_dump_json()
                 self.events.put_nowait({'method': 'item/completed', 'params': {**base, 'item': {'type': 'agentMessage', 'phase': 'final_answer', 'text': output}}})
                 self.events.put_nowait({'method': 'turn/completed', 'params': {**base, 'turn': {'id': tid, 'status': 'completed'}}})
             return {'turn': {'id': tid, 'status': 'inProgress'}}
@@ -204,8 +207,18 @@ def test_financial_expiry_interrupts_active_turn_without_retry(make_run, monkeyp
     rpc.mode = 'timeout'
     # Only the local deadline is shortened; no actual account/model is called.
     monkeypatch.setattr('audit3.codex_runtime.financial_remaining', lambda checked: .02)
-    with pytest.raises(RuntimePaused, match='expirou durante o turno'):
-        asyncio.run(runtime.invoke('auditor', 'initial-0000', {}, tools))
+    async def exercise():
+        loop = asyncio.get_running_loop()
+        clock = [loop.time()]
+        monkeypatch.setattr(loop, 'time', lambda: clock[0])
+        original_get = rpc.events.get
+        async def expire_after_dispatch():
+            clock[0] += .03
+            return await original_get()
+        monkeypatch.setattr(rpc.events, 'get', expire_after_dispatch)
+        with pytest.raises(RuntimePaused, match='expirou durante o turno'):
+            await runtime.invoke('auditor', 'initial-0000', {}, tools)
+    asyncio.run(exercise())
     assert sum(method == 'turn/start' for method, _ in rpc.calls) == 1
     assert sum(method == 'turn/interrupt' for method, _ in rpc.calls) == 1
     assert rpc.closed
@@ -506,12 +519,12 @@ def test_rpc_timeout_inside_turn_is_distinguished_from_turn_deadline(make_run):
     store,m,runtime,rpc,tools=rig(make_run)
     original=rpc.request
     reads=0
-    async def request(method,params):
+    async def request(method,params, **kwargs):
         nonlocal reads
         if method=='account/rateLimits/read':
             reads+=1
             if reads==2:raise TimeoutError('MOCK RPC timeout; no network')
-        return await original(method,params)
+        return await original(method,params, **kwargs)
     rpc.request=request
     rpc.events.put_nowait({'method':'account/rateLimits/updated','params':{}})
     with pytest.raises(RuntimePaused,match='rpc_timeout; aguardando rpc:account/rateLimits/read'):
@@ -525,6 +538,9 @@ def test_explicit_interruption_recovery_uses_existing_slot_and_reuses_auditor(ma
     store,m,runtime,rpc,tools=rig(make_run)
     store.put(m.run_id,'baseline',{'ids':[]})
     runtime.config.limits.call_timeout=1
+    from helpers import initial_investigation
+    rpc.output = initial_investigation(store, m, 'auditor').model_dump_json()
+    defender_output = initial_investigation(store, m, 'defensor').model_dump_json()
     workflow=Workflow(store,m.run_id,runtime=runtime)
     async def exercise():
         await workflow.invoke('auditor','initial-0000')
@@ -539,6 +555,7 @@ def test_explicit_interruption_recovery_uses_existing_slot_and_reuses_auditor(ma
             'source':'official_app_server_thread_read','status':'interrupted',
             'invocation_id':old['invocation_id'],'thread_id':turn['thread_id'],'turn_id':turn['turn_id']},immutable=True)
         recovered=FakeRPC(runtime.home)
+        recovered.output = defender_output
         runtime.rpc=recovered
         await workflow.invoke('auditor','initial-0000')
         assert recovered.calls==[]
@@ -602,7 +619,10 @@ def mock_single_extra_authorization(store, manifest, runtime):
 def test_one_explicit_extra_slot_preserves_history_and_reuses_auditor(make_run):
     store,m,runtime,rpc,tools=rig(make_run)
     mock_single_extra_authorization(store,m,runtime)
-    cached={'output':Opinion(summary='MOCK cached Auditor',inspections=[],findings=[],positions=[],limitations=[]).model_dump(mode='json')}
+    from helpers import initial_investigation
+    auditor_opinion = initial_investigation(store, m, 'auditor')
+    rpc.output = initial_investigation(store, m, 'defensor').model_dump_json()
+    cached={'role': 'auditor', 'phase': 'initial-0000', 'published_at': now(), 'output': auditor_opinion.model_dump(mode='json')}
     store.put(m.run_id,'roles/auditor/phases/initial-0000',cached,immutable=True)
     preserved={str(p):p.read_bytes() for folder in ('roles/auditor/phases','roles/defensor/attempts','codex-turns')
         for p in store.path(m.run_id,folder).glob('*.json')}
@@ -733,8 +753,8 @@ def test_official_notification_requires_full_quota_read_not_inferred_recovery(ma
 def test_official_cumulative_samples_not_misreported_as_additive_turn_usage(make_run):
     store,m,r,rpc,tools=rig(make_run)
     original=rpc.request
-    async def request(method,params):
-        result=await original(method,params)
+    async def request(method,params, **kwargs):
+        result=await original(method,params, **kwargs)
         if method=='turn/start':
             rpc.events._queue.appendleft({'method':'thread/tokenUsage/updated','params':{'threadId':params['threadId'],'turnId':result['turn']['id'],
                 'tokenUsage':{'last':{'inputTokens':25,'outputTokens':5},'total':{'inputTokens':100,'outputTokens':20}}}})
@@ -758,8 +778,8 @@ def test_resume_usage_snapshot_from_known_prior_turn_is_not_current_usage(make_r
             'turn_id':'prior-turn','status':prior_status})
         prior_bytes=store.path(m.run_id,prior_name+'.json').read_bytes()
         original=rpc.request
-        async def request(method,params):
-            result=await original(method,params)
+        async def request(method,params, **kwargs):
+            result=await original(method,params, **kwargs)
             if method=='thread/resume':
                 # CLI 0.167.0 replays the last known thread usage on resume,
                 # before any new turn/start and with the previous turn's ID.
@@ -798,8 +818,8 @@ def test_resume_usage_exception_does_not_accept_unknown_or_other_turn_work(
         store.put(m.run_id,'codex-turns/'+'d'*24,{'role':prior_role,
             'thread_id':thread,'turn_id':'prior-turn','status':'completed'})
         original=rpc.request
-        async def request(name,params):
-            result=await original(name,params)
+        async def request(name,params, **kwargs):
+            result=await original(name,params, **kwargs)
             if name=='thread/resume':
                 rpc.events.put_nowait({'method':method,'params':{
                     'threadId':event_thread or thread,'turnId':event_turn,

@@ -31,3 +31,25 @@ class MockRuntime:
         if final:
             return Judgment(summary="MOCK: no findings", verdicts=[], new_findings=[], limitations=[])
         return Opinion(summary="MOCK infrastructure exercise", inspections=records, findings=[], positions=[], limitations=[])
+
+
+def initial_investigation(store, manifest, role):
+    """Explicit opt-in for positive recovery fixtures, using authentic tool events."""
+    from audit3.config import Config
+    from audit3.tools import SourceTools, ToolContext
+    phase = 'blind' if role == 'juiz' else 'initial-0000'
+    tools = SourceTools(store, manifest, Config.model_validate(store.get(manifest.run_id, 'config')),
+                        None, ToolContext(manifest.run_id, role, phase, 'mock-prior-investigation'))
+    records = []
+    for f in manifest.files:
+        if f.category in {'excluded', 'prior_report'} or not f.lines:
+            continue
+        start = 1
+        while start <= f.lines:
+            result = tools.read_source(f.path, start, f.lines)
+            end = result['lines'][-1]['line']
+            records.append(InspectionRecord(refs=[SourceRef(path=f.path, start=start, end=end, sha256=f.sha256)],
+                requirement='Synthetic input invariant', analysis='MOCK explicit inspection for recovery fixture',
+                flow_verified=False, flow_description='', limitations=[]))
+            start = end + 1
+    return Opinion(summary='MOCK inspected initial opinion', inspections=records, findings=[], positions=[], limitations=[])

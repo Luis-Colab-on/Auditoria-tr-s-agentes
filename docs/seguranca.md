@@ -6,6 +6,15 @@ com argumentos restritos e Docker/Compose. `prepare` nunca faz checkout e lê bl
 Git sem filtros; hooks, fsmonitor e configuração global são desativados. Não se reutilizam
 tokens ChatGPT, credenciais GitHub, SSH agent ou configuração de produção.
 
+Na aquisição local, somente o commit explícito é lido. Não se executa `git status`
+na worktree recebida: esse comando pode acionar filtros `clean` da configuração
+local, mesmo sem checkout. O manifesto registra
+`tree_state=worktree_not_inspected_commit_only`; isso não afirma que a worktree
+esteja limpa. Arquivos modificados e não rastreados permanecem intactos. Repositórios
+bare registram `bare`, e ZIPs registram `no_git_history`. Quantidade, tamanho
+individual e tamanho total são verificados antes de ler cada blob Git, inclusive
+links excluídos; os links e submódulos nunca são seguidos ou executados.
+
 `list_source`, `read_source`, `search_source`, `submit_test`, `read_evidence` são as únicas
 ferramentas do runtime. Identidade, fase e run_id vivem em contexto/closures do controlador;
 não são argumentos que o modelo pode trocar. Não há ferramenta para ler parecer privado,
@@ -43,6 +52,22 @@ e script montados readonly. Não montam socket Docker, HOME, SSH, token ou crede
 Inspeção após `create` verifica essas condições e bloqueia a execução se divergem. Os
 processos Docker do controlador usam ambiente mínimo e nenhuma configuração remota do
 Docker herdada. Imagens precisam ser confiáveis, adquiridas separadamente e fixadas em ID.
+
+O helper de subprocessos do controlador cria uma sessão POSIX exclusiva. O timeout
+cobre execução e drenagem dos pipes. Ao vencer ou receber cancelamento, o helper
+encerra o grupo do subprocesso, incluindo filhos que herdaram stdout/stderr, e
+permite até 0,25 segundo adicional para drenagem e coleta. A tolerância de limpeza
+não amplia o tempo permitido de execução; agendamento do sistema impede prometer
+retorno exato no milissegundo. Tempos observados de execução e encerramento são
+informados nos receipts com timeout. Docker/Compose continuam responsáveis pela
+remoção explícita dos containers: matar o cliente Docker não remove um container.
+
+Os hashes de saída abrangem os bytes drenados antes da sanitização, inclusive os
+que excedem o limite de retenção do texto. Se não houver EOF até o prazo de limpeza,
+os pipes são fechados, as tarefas locais são canceladas e a saída é marcada como
+incompleta e truncada. Nesse caso os hashes descrevem somente o prefixo observado,
+com a insuficiência registrada no receipt. Essa contenção de processos confiáveis
+do controlador não substitui o isolamento Docker do código auditado.
 
 Compose usa apenas rede interna com gateway isolated, sem portas no host ou rede default.
 Bloqueios HTTP do WordPress são defesa adicional: não substituem a rede, pois PHP, plugins,

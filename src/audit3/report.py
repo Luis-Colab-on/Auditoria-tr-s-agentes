@@ -10,7 +10,7 @@ from .completion import assess_completion, protocol_phases, VERSION as ASSESSMEN
 from .causality import causal_groups
 from .config import Config
 from .tools import SourceTools, ToolContext
-from .security import PolicyError
+from .security import PolicyError, object_hash
 
 
 def receipt_observation(store: Store, run_id: str):
@@ -53,22 +53,32 @@ def coverage(store: Store, manifest: RunManifest):
         for f in manifest.files:
             if f.category not in {"excluded", "prior_report"}:
                 roles[role][f.path] = {"inventoried": True, "total_lines": f.lines, "consulted": set(), "analysis_recorded": set(), "flow_verified": set()}
-    for name in store.names(manifest.run_id, "events"):
-        event = store.get(manifest.run_id, "events/" + name)
-        d = event["data"]
-        if event["kind"] == "tool" and d.get("tool") == "read_source" and d.get("path") in roles.get(d.get("role"), {}):
-            roles[d["role"]][d["path"]]["consulted"].update(range(d["start"], d["end"] + 1))
+    config = Config.model_validate(store.get(manifest.run_id, "config"))
     for role in roles:
+        phase = "blind" if role == "juiz" else "initial-0000"
+        tools = SourceTools(store, manifest, config, None, ToolContext(manifest.run_id, role, phase, "coverage"))
+        for event in tools.source_read_events():
+            d = event["data"]
+            roles[role][d["path"]]["consulted"].update(range(d["start"], d["end"] + 1))
         for name in store.names(manifest.run_id, f"roles/{role}/phases"):
-            output = store.get(manifest.run_id, f"roles/{role}/phases/{name}")["output"]
-            for inspection in output.get("inspections", []):
-                for ref in inspection["refs"]:
-                    if ref["path"] not in roles[role]:
-                        continue
-                    entry = roles[role][ref["path"]]
-                    entry["analysis_recorded"].update(range(ref["start"], ref["end"] + 1))
-                    if inspection["flow_verified"]:
-                        entry["flow_verified"].update(range(ref["start"], ref["end"] + 1))
+            if not (name == "blind" if role == "juiz" else name.startswith("initial-")):
+                continue
+            record = store.get(manifest.run_id, f"roles/{role}/phases/{name}")
+            tools.read_before = record.get("published_at")
+            if not tools.read_before:
+                continue
+            from .schemas import InspectionRecord
+            for raw in record["output"].get("inspections", []):
+                try:
+                    inspection = InspectionRecord.model_validate(raw)
+                    tools.validate_inspection(inspection)
+                except (PolicyError, ValueError):
+                    continue
+                for ref in inspection.refs:
+                    entry = roles[role][ref.path]
+                    entry["analysis_recorded"].update(range(ref.start, ref.end + 1))
+                    if inspection.flow_verified:
+                        entry["flow_verified"].update(range(ref.start, ref.end + 1))
     gaps = []
     for role, entries in roles.items():
         for path, entry in entries.items():
@@ -80,6 +90,9 @@ def coverage(store: Store, manifest: RunManifest):
                 del entry[key]
             if role != "juiz" and (entry["missing_consulted"] or entry["missing_analysis_recorded"]):
                 gaps.append(f"{role}: {path}: leitura/análise incompletas")
+    from .investigation import assess_independent_investigation
+    independent = assess_independent_investigation(store, manifest)
+    gaps.extend(independent["gaps"])
     receipts = [store.get(manifest.run_id, "receipts/" + name) for name in store.names(manifest.run_id, "receipts")]
     executed = [r["id"] for r in receipts if r["execution"] in {"docker", "compose"} and r["status"] in {"passed", "failed"}]
     if not executed:
@@ -89,8 +102,8 @@ def coverage(store: Store, manifest: RunManifest):
     excluded = [f.model_dump() for f in manifest.files if f.category == "excluded"]
     if excluded:
         gaps.append(f"{len(excluded)} arquivos omitidos: escopo limitado pelo inventário.")
-    return {"roles": roles, "excluded": excluded, "executed_test_receipts": executed, "gaps": gaps,
-        "interpretation": "Inventário, leitura, análise registrada, fluxo declarado verificado e execução são medidas distintas; não provam compreensão integral."}
+    return {"roles": roles, "independent_investigation": independent, "excluded": excluded, "executed_test_receipts": executed, "gaps": gaps,
+        "interpretation": "Leitura e análise abaixo consideram somente investigação inicial autenticada antes da barreira. Juiz realiza inspeção dirigida, sem exigência de cobertura integral. Inventário, leitura, análise, fluxo declarado e execução são medidas distintas; não provam compreensão integral."}
 
 
 def intervals(values):
@@ -103,7 +116,51 @@ def intervals(values):
     return result
 
 
-def build_report(store: Store, run_id: str):
+def structural_checks(store, manifest, state, judgment):
+    """Re-evaluate immutable evidence without rewriting historical records."""
+    from .snapshot import verify_source
+    from .workflow import Workflow
+    from .schemas import Judgment
+    from .operational import total_seconds
+    result = {'evidence_context_hash': object_hash({
+        'events': [store.get(manifest.run_id, 'events/' + n) for n in store.names(manifest.run_id, 'events')],
+        'tests': [store.get(manifest.run_id, 'tests/' + n) for n in store.names(manifest.run_id, 'tests')],
+        'barrier': store.get(manifest.run_id, 'barrier') if store.exists(manifest.run_id, 'barrier') else None,
+        'operational': [store.get(manifest.run_id, 'operational/' + n) for n in store.names(manifest.run_id, 'operational')]})}
+    config = Config.model_validate(store.get(manifest.run_id, 'config'))
+    def check(key, operation):
+        try:
+            operation()
+        except (PolicyError, ValueError, KeyError, OSError) as exc:
+            result[key] = False
+            result[key + '_error'] = redact(str(exc))[:1000]
+        else:
+            result[key] = True
+    check('source_integrity', lambda: verify_source(store, manifest))
+    def final():
+        if not judgment:
+            raise PolicyError('Julgamento final ausente')
+        record = store.get(manifest.run_id, 'roles/juiz/phases/final')
+        if record['output'] != judgment:
+            raise PolicyError('Julgamento diverge da fase final persistida')
+        tools = SourceTools(store, manifest, config, None,
+            ToolContext(manifest.run_id, 'juiz', 'final', 'report-validation'))
+        Workflow(store, manifest.run_id, runtime=object()).validate_output(
+            Judgment.model_validate(judgment), tools, final=True)
+    check('final_validation', final)
+    def limits():
+        calls = store.get(manifest.run_id, 'ledger')['calls']
+        if len(calls) > config.limits.max_calls:
+            raise PolicyError('Limite de chamadas excedido')
+        if state.get('elapsed_seconds', 0) > total_seconds(store, manifest.run_id, config):
+            raise PolicyError('Limite global excedido sem extensão válida')
+        if any(c['status'] == 'in_flight' for c in calls):
+            raise PolicyError('Chamada ainda em andamento/ambígua')
+    check('limits_valid', limits)
+    return result
+
+
+def build_report(store: Store, run_id: str, *, use_review=True):
     manifest = RunManifest.model_validate(store.get(run_id, "manifest"))
     state = store.get(run_id, "state")
     published = store.exists(run_id, "barrier")
@@ -157,8 +214,26 @@ def build_report(store: Store, run_id: str):
     additional_round = (store.get(run_id, 'material-review')['additional_round']
                         if store.exists(run_id, 'material-review') else False)
     report['required_phases'] = protocol_phases(manifest, Config.model_validate(store.get(run_id, 'config')), additional_round)
-    review = store.get(run_id, review_name) if store.exists(run_id, review_name) else None
-    report['completion_assessment'] = assess_completion(report, review)
+    report['structural_checks'] = structural_checks(store, manifest, state, judgment)
+    review = store.get(run_id, review_name) if use_review and store.exists(run_id, review_name) else None
+    report['completion_review'] = review
+    try:
+        report['completion_assessment'] = assess_completion(report, review)
+    except PolicyError as exc:
+        report['completion_assessment'] = assess_completion(report)
+        report['completion_assessment']['blockers'].append({'kind': 'invalid_review', 'text': str(exc)})
+        report['completion_assessment']['status'] = 'partial'
+        report['completion_assessment']['review_status'] = 'invalid'
+    report['acceptance'] = {'status': 'not_evaluated', 'reason': 'Aceitação do smoke exige verificação explícita do processo real'}
+    if store.exists(run_id, 'assessment/smoke-acceptance'):
+        from .completion import context_hash
+        accepted = store.get(run_id, 'assessment/smoke-acceptance')
+        if (accepted.get('context_hash') == context_hash(report)
+            and accepted.get('review_id') == report['completion_assessment'].get('review_id')
+            and report['completion_assessment']['status'] == 'completed'):
+            report['acceptance'] = accepted
+        else:
+            report['acceptance'] = {'status': 'pending', 'reason': 'Aceitação anterior não corresponde às evidências atuais'}
     return report
 
 
@@ -171,6 +246,11 @@ def markdown(report):
     lines = ["# Auditoria audit3", "", f"Execução: `{m['run_id']}`", f"Fonte: `{m['source_id']}`", f"Commit: `{m['commit'] or 'não aplicável (ZIP)'}`", "",
         f"Estado operacional: **{s['status']}**", f"Resultado técnico: **{s['technical_result']}**", "", report["validation"], "",
         "## Decisões", "", "| Achado | Classificação | Decisão |", "|---|---|---|"]
+    completion = report['completion_assessment']
+    lines += ["Conclusão derivada do escopo: **" + completion['status'] + "**",
+        "Revisão: " + str(completion.get('review_id') or completion['review_status']),
+        "Aceitação do smoke: " + report.get('acceptance', {}).get('status', 'not_evaluated'), "",
+        "Pendências/bloqueios: " + json.dumps(completion['blockers'], ensure_ascii=False), ""]
     for verdict in report["verdicts"]:
         lines.append(f"| {verdict['finding_id']} | {verdict['classification']} | {verdict['decision']} |")
     if not report["verdicts"]:
@@ -208,7 +288,7 @@ def export_zip(store: Store, run_id: str, destination: Path, selected: list[str]
         selected = sorted({eid for f in report["findings"] for eid in f["evidence_ids"]} | {r["id"] for r in report["receipts"] if r["owner"] == "baseline"} | {eid for v in report["verdicts"] for eid in v.get("evidence_ids", [])})
     for eid in selected:
         if eid not in available:
-            from .security import PolicyError
+            from .security import PolicyError, object_hash
             raise PolicyError("evidência não publicada/não existente")
         content["evidence/" + eid + ".json"] = canonical(available[eid])
         content["evidence/" + eid + "-test.json"] = canonical(store.get(run_id, "tests/" + eid))

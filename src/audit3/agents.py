@@ -46,11 +46,15 @@ class Budget:
             self.store.put(self.run_id, "ledger", ledger)
             return cid
 
-    async def finish(self, cid, usage=None, error=None):
+    async def finish(self, cid, usage=None, error=None, dispatch_status=None):
         async with self.lock:
             ledger = self.store.get(self.run_id, "ledger")
             entry = next(c for c in ledger["calls"] if c["id"] == cid)
             entry.update(finished_at=now(), status="error" if error else "completed", error=error)
+            if dispatch_status is not None:
+                entry['dispatch_status'] = dispatch_status
+                if dispatch_status == 'not_sent':
+                    entry['status'] = 'not_sent'
             if usage is not None:
                 entry["input_tokens"] = getattr(usage, "input_tokens", None)
                 entry["output_tokens"] = getattr(usage, "output_tokens", None)

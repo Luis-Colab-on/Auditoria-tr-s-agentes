@@ -104,23 +104,53 @@ def test_invalid_causal_proofs_are_never_used(failure):
 
 
 def completion_fixture():
+    """Complete MOCK report contract for the packaged synthetic review policy.
+
+    This fixture exercises report assessment only; flags and receipt copies are
+    synthetic assertions supplied to the unit under test, never real run evidence.
+    """
+    from audit3.scope_review import policy, NOTES
+    catalog = policy()
     phases=['auditor/initial-0000','defensor/initial-0000','juiz/blind','auditor/contest',
             'defensor/contest','auditor/reply','defensor/reply','juiz/review','juiz/final']
-    report={'manifest':{'requirements':'Inspect the frozen numerical contract; no code changes or production certification.',
-        'limitations':['Production data absent.']},'coverage':{'gaps':[]},
+    manifest = {'requirements': catalog['objective'], 'run_id': 'a' * 24, 'source_id': 'MOCK-source',
+        'backend': 'codex-app-server', 'limitations': [note[0] for note in NOTES.values()],
+        'files': [{'path': path, 'sha256': sha, 'category': 'source'} for path, sha in catalog['files'].items()]}
+    verdict = {'finding_id': 'auditor-synthetic', 'classification': 'falha comprovada',
+               'decision': 'corrigir agora', 'root_cause_id': None, 'evidence_ids': ['b' * 24]}
+    finding = {'id': 'auditor-synthetic', 'source_id': manifest['source_id'], 'production_observation': 'unknown',
+               'refs': [{'path': 'app.py', 'start': 1, 'end': 6, 'sha256': catalog['files']['app.py']}]}
+    report={'manifest': manifest, 'coverage': {'gaps': [],
+            'independent_investigation': {'valid': True, 'version': 'blind-investigation-1', 'gaps': []}},
         'opinions':{role:[{'phase':phase.split('/')[1],'output':{'limitations':[]}}
                          for phase in phases if phase.startswith(role+'/')]
                     for role in ('auditor','defensor','juiz')},
-        'judgment':{'new_findings':[],'limitations':['Correction not implemented.'],
-            'verdicts':[{'classification':'falha comprovada'}]},'state':{'completed':phases}}
+        'judgment':{'new_findings':[], 'limitations': [],
+            'baseline_assessment': 'MOCK: failed signed refund expectation in the synthetic fixture; no production claim.',
+            'verdicts': [copy.deepcopy(verdict)]},
+        'state': {'completed': phases, 'phase': 'done', 'status': 'partial', 'runtime_mode': 'codex-app-server'},
+        'structural_checks': {'source_integrity': True, 'final_validation': True, 'limits_valid': True},
+        'causal_validation': {'valid': True, 'gaps': [], 'version': VERSION},
+        'findings': [finding], 'verdicts': [verdict], 'required_phases': phases.copy(),
+        'proven_causal_groups': [{'member_ids': [finding['id']], 'proofs': []}],
+        'receipts': [{'id': 'b' * 24, 'owner': 'baseline', 'execution': 'docker', 'status': 'failed',
+            'timeout': False, 'output_truncated': False, 'run_id': manifest['run_id'],
+            'source_id': manifest['source_id'], 'purpose': 'MOCK receipt contract; no execution',
+            'stdout': '', 'stderr': 'MOCK failure transcript'}],
+        'usage': {'calls': [], 'tokens': None, 'known_cost_usd': None},
+        'runtime': {'backend': 'codex-app-server', 'fixture_only': True}}
     return report
 
 
 def scoped_review(report):
-    return {'version':VERSION,'context_hash':context_hash(report),
-        'objective':report['manifest']['requirements'],'messages':{key:{'kind':'scope_note',
-        'justification':'Objective is readonly inspection; no production or remediation claim is made.',
-        'evidence':['/manifest/requirements']} for key in limitation_messages(report)}}
+    from audit3.scope_review import make_review
+    return make_review(report)
+
+
+def identify_review(review):
+    """Re-sign a deliberate test edit so its substantive validation is exercised."""
+    review['id'] = object_hash({key: value for key, value in review.items() if key != 'id'})
+    return review
 
 
 def test_completed_means_concluded_scope_even_with_a_proven_defect():
@@ -141,6 +171,7 @@ def test_real_gaps_and_unexplained_limits_cannot_be_waived(failure):
         review['context_hash']=context_hash(report)
     if failure=='review_context':review['context_hash']='wrong'
     if failure=='bad_evidence':next(iter(review['messages'].values()))['evidence']=['/missing']
+    identify_review(review)
     if failure in ('review_context','bad_evidence'):
         with pytest.raises(PolicyError):assess_completion(report,review)
     else:
@@ -155,7 +186,8 @@ def test_unreviewed_notes_block_by_default():
 def test_review_cannot_replace_original_message_or_its_provenance():
     report=completion_fixture();review=scoped_review(report)
     next(iter(review['messages'].values()))['text']='silently replaced'
-    with pytest.raises(PolicyError):assess_completion(report,review)
+    identify_review(review)
+    with pytest.raises(PolicyError, match='sem justificativa/evidência'):assess_completion(report,review)
 
 
 def test_completed_marker_without_saved_phase_is_not_completion():
