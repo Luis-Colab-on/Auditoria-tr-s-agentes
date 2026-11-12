@@ -1,0 +1,117 @@
+{
+  "format": "sanitized-public-integrated-validation-summary-1",
+  "validation_date": "2026-11-12",
+  "run_id": "e7a349ffa7b7bcdf47de1ab4",
+  "scope": "Only the public synthetic PHP/WordPress stock fixture; production and external projects excluded",
+  "executed_controller_commit": "2fa7530183f11f074a68fa149f01cf9a1991447e",
+  "real_execution": {
+    "phase": "done",
+    "completed_phases": 9,
+    "roles": {
+      "auditor": {
+        "completed_calls": 3
+      },
+      "defensor": {
+        "completed_calls": 3
+      },
+      "juiz": {
+        "completed_calls": 3
+      }
+    },
+    "model": "gpt-6-astra",
+    "effort": "max",
+    "service_tier": "default",
+    "official_client_version": "0.167.0",
+    "calls": 9,
+    "elapsed_seconds": 894.8280034360068,
+    "aggregate_tokens": null,
+    "aggregate_cost": null
+  },
+  "historical_acceptance": {
+    "passed": 22,
+    "failed": 2,
+    "total": 24,
+    "raw_status": "partial",
+    "preserved": true,
+    "failed_checks": [
+      "scoped_completion",
+      "general_real_acceptance"
+    ],
+    "cause": "72 agent narrative limitations unresolved by the previous three-controller-note policy"
+  },
+  "offline_reassessment": {
+    "passed": 24,
+    "failed": 0,
+    "total": 24,
+    "reviewed_scope": "completed",
+    "raw_status": "partial",
+    "evaluator_version": "scoped-assessment-5",
+    "narrative_policy": "explicit-narrative-v1",
+    "narrative_messages": 72,
+    "reviewed_claims": 103,
+    "classifications": {
+      "blocking": 0,
+      "unresolved": 0,
+      "scope_note": 39,
+      "procedure_note": 33
+    },
+    "structural_waivers": false,
+    "new_real_execution": false,
+    "original_answers_edited": false,
+    "semantic_interpretation": "Explicit responsibility of the offline reviewer; machine checks factual predicates, provenance, exact text coverage and structural obligations"
+  },
+  "local_tests": {
+    "passed": 602,
+    "failed": 0,
+    "deselected_docker_live": 8,
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -q -m 'not docker and not live'",
+    "focused_passed": 154,
+    "new_regression_cases": 38,
+    "initial_full_attempt": {
+      "passed": 601,
+      "failed": 1,
+      "reason": "Mock source-read timestamps later than phase publication; isolated test and full repetition passed without code, limit or assertion changes"
+    }
+  },
+  "latest_evaluator_real_execution": "Not performed; current conclusion is offline reassessment of the previous real run",
+  "known_defect": {
+    "source": "tests/fixtures/wordpress-stock/inventory.php",
+    "line": 6,
+    "stock": 10,
+    "reservation": 3,
+    "expected": 7,
+    "observed": 13,
+    "confirmed_by_three_roles": true
+  },
+  "protected_controls": {
+    "source_unchanged": true,
+    "invalid_inputs_rejected": true,
+    "anonymous_and_subscriber_denied": true,
+    "administrator_allowed": true
+  },
+  "causality": {
+    "finding_ids": 3,
+    "formal_php_merge": false,
+    "independent_defect_count": null
+  },
+  "preservation": {
+    "historical_files_hash_checked": 200,
+    "changed": 0,
+    "added": 0,
+    "removed": 0
+  },
+  "limits_specific_to_real_run": {
+    "global_seconds": 1500,
+    "turn_seconds": 300,
+    "max_calls": 16,
+    "automatic_extension": false
+  },
+  "remaining_scope_limits": [
+    "No production occurrence or temporal-origin proof",
+    "Returned value demonstrated; persistence and external operational effects unverified",
+    "Internal REST dispatch; no external HTTP authentication validation",
+    "No exhaustive dynamic coverage or repaired-version validation",
+    "No supported PHP causal equivalence certificate"
+  ],
+  "publication_note": "Reviewed public summary only; not an original receipt or independent public attestation. Account data, confirmations, sessions, credentials, full reports and operational logs remain local. No new inference, financial operation or ZIP generated for this publication."
+}

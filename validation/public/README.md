@@ -5,6 +5,27 @@ operacionais originais continuam preservados localmente e não fazem parte do Gi
 O [resumo sanitizado](summary.json) foi derivado dos resultados existentes, sem
 nova inferência, execução de testes ou alteração de pareceres.
 
+## Referência atual e reavaliação offline
+
+O [resumo integrado de 12/11/2026](integrated-20261112.json) registra a execução
+real encerrada do run `e7a349ffa7b7bcdf47de1ab4`: nove chamadas concluídas,
+894,828 segundos, três papéis efetivos e aceitação histórica preservada em
+**22/24**. A reavaliação offline dos mesmos registros aprovou **24/24**, após
+examinar 72 narrativas com `explicit-narrative-v1` (39 notas de escopo e 33 de
+procedimento). O estado bruto permanece `partial`; a conclusão revisada é
+`completed`. Os registros originais não foram alterados.
+
+A suíte local final aprovou **602 testes**, com zero falhas e oito integrações
+Docker/live não executadas nessa etapa offline. A mudança mais recente do
+avaliador não passou por uma nova execução real completa. O resumo público é uma
+derivação revisada dos registros privados, não um receipt original nem uma prova
+pública independente. Tokens e custos agregados permanecem desconhecidos.
+
+## Referência anterior preservada
+
+O arquivo [summary.json](summary.json) descreve somente o run anterior
+`570af15e2192e19f73ddaff7` e não foi reescrito para refletir o resultado atual.
+
 O cenário sintético PHP/WordPress terminou com 22 checagens aprovadas sob a extensão
 global explicitamente autorizada de 900 para 1.500 segundos, restrita ao julgamento
 final. Foram preservados o limite de 16 chamadas, até 300 segundos por turno, os

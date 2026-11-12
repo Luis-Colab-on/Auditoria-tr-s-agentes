@@ -1,9 +1,10 @@
 # Operação no Linux/WSL
 
 O [guia de uso da versão validada](uso-versao-validada.md) reúne os comandos e os
-limites efetivos da referência PHP/WordPress encerrada em 12/11/2026. Sua aprovação
-ocorreu sob extensão autorizada e revisão local das notas, preservando o estado
-bruto e a reprovação anterior. Este documento mantém os detalhes operacionais.
+limites efetivos da referência PHP/WordPress encerrada em 12/11/2026: execução real
+concluída, aceitação histórica 22/24 e reavaliação offline 24/24. O estado bruto e
+os resultados anteriores permanecem preservados; o avaliador mais recente não
+teve uma nova execução real completa. Este documento mantém os detalhes operacionais.
 
 ## Restrição financeira permanente
 

@@ -47,6 +47,9 @@ def supporting_evidence(report, criterion):
 
 
 def validate_annotation(report, message, annotation, review=None):
+    if annotation.get('policy') == 'explicit-narrative-v1':
+        from .narrative_review import validate_annotation as validate_narrative
+        return validate_narrative(report, message, annotation, review or {})
     if annotation.get('policy') == 'explicit-scope-v1':
         from .explicit_review import validate_annotation as validate_explicit
         return validate_explicit(report, message, annotation, review or {})

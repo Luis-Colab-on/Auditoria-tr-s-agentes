@@ -77,8 +77,8 @@ revise um novo rascunho; não copie o hash atual para dispensar a revisão.
 
 ## Critérios e bloqueios
 
-A revisão suporta três ressalvas conhecidas, sempre preservando seu texto e
-proveniência:
+A política `explicit-scope-v1` suporta três ressalvas do controlador, sempre
+preservando seu texto e proveniência:
 
 | Critério | Ressalva e evidência necessária |
 |---|---|
@@ -102,6 +102,80 @@ correto e sem achados. A exigência de baseline `failed` pertence à aceitação
 smoke que deve reproduzir um defeito conhecido, não à conclusão geral. Achados
 PHP individuais com IDs separados e `root_cause_id` nulo ou exclusivo continuam
 sem depender de certificados Python.
+
+## Revisão explícita das narrativas dos papéis
+
+O avaliador `scoped-assessment-5` também aceita `explicit-narrative-v1`, critério
+`reviewed-claims`. Não há classificação automática de narrativas nem lista de
+frases dispensáveis. A política automática Python permanece restrita à sua
+fixture. Uma mensagem desconhecida continua pendente até ser examinada.
+
+Use o mesmo rascunho e os mesmos comandos `review-completion` acima. Preserve o
+cabeçalho `policy: explicit-scope-v1`, o revisor, os campos `scope`, o objetivo e
+os vínculos atuais; acrescente `narrative_policy: explicit-narrative-v1`. Para
+cada mensagem narrativa revisada, informe:
+
+- `policy: explicit-narrative-v1`, `criterion: reviewed-claims`, o texto em
+  `original_text`, seu `original_hash` e todas as `origins` atuais.
+- `claims`: partes contíguas, com `start` inclusivo, `end` exclusivo e `text`
+  exatamente iguais ao original. Todas as partes da mensagem devem ser
+  examinadas. Cada parte tem `kind`, `requirement_ids`, `interpretation`,
+  `semantic_responsibility: reviewer`, `checks` e `facts`.
+- `requirements_hash`: hash de `narrative_requirements`, lista no cabeçalho que
+  cobre integralmente o objetivo original com os mesmos campos de intervalo,
+  mais `id` único e `interpretation`. Não substitua o objetivo por uma paráfrase.
+- `evidence`: conjunto exato dos ponteiros de relatório usados nos fatos dessa
+  mensagem e de seus limites de escopo. Os fatos de fonte/script têm suas
+  próprias chaves autenticadas, descritas abaixo.
+
+Cada afirmação exige as verificações `source_integrity`, `protocol`,
+`final_judgment` e `receipt_integrity`. Há também `initial_investigation`,
+`causal_separation` (IDs sem fusão) e `limits`, quando pertinentes. Os bloqueios
+estruturais gerais são aplicados mesmo se não forem citados na afirmação.
+Receipts ausentes, com timeout, truncamento, hashes incoerentes ou de outra
+fonte/run não sustentam uma dispensa narrativa.
+
+`facts` contém predicados verificáveis: `domain: report` com `reference` para
+cobertura, verificações estruturais, receipts, inventário, fases concluídas,
+veredictos ou comparações; ou `domain: source`/`test` com `key`. Os operadores
+são `equals` (valor JSON exato), `hash` (SHA-256 do JSON canônico), `contains` e
+`not_contains` (trecho literal não vazio). O valor esperado fica em `expected`.
+Não use texto do modelo como fato independente. Um ponteiro existente ou uma
+flag isolada não é suporte suficiente: deve haver fato de fonte, script ou
+resultado primário de cobertura/execução/julgamento pertinente à afirmação.
+
+O cabeçalho `evidence_bundle` tem `sources` (caminho → texto integral) e `tests`
+(ID do receipt → script integral). O avaliador confere esses textos pelos
+SHA-256 do inventário e dos receipts antes de usá-los. Ele não executa os textos.
+Para `scope_note`, informe também `boundary_id`, apontando para uma entrada em
+`scope_boundaries` com `requirement_ids`, `interpretation`,
+`semantic_responsibility: reviewer` e `facts`. Esse limite explica por que a
+informação ausente não integra o objetivo **original**, sem alterá-lo.
+
+A máquina confere vínculos, abrangência textual, predicados e condições
+estruturais. **O revisor assume a interpretação semântica**: a pertinência dos
+fatos, a decomposição de afirmações misturadas, o alcance do contrato e a
+resolução de aparentes contradições. Hashes e predicados não provam sozinhos
+essa interpretação. Justificativa preenchida e rótulo escolhido não substituem
+esse exame. Mensagem de modelo não vira nota do Executor; as políticas e
+proveniências continuam distintas.
+
+A classificação da mensagem agrega suas partes: `blocking` prevalece sobre
+`unresolved`, que prevalece sobre `procedure_note` e `scope_note`. Não deixe uma
+parte não examinada. Um fato ausente/contraditório ou uma revisão inválida mantém
+a mensagem pendente; evidência modificada invalida o contexto da revisão.
+
+Para reproduzir uma revisão já preenchida e versionada, sem executar agentes:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/audit3 --store .audit3 review-completion ID --review /caminho/revisao.json --output /caminho/novo/avaliacao.json --export /caminho/novo/avaliacao.zip
+```
+
+Essa saída ainda deixa a aceitação específica como `not_evaluated`. Uma
+reavaliação de run histórico deve identificar separadamente o commit executado,
+a versão do avaliador e o resultado derivado. Não a apresente como execução real
+da implementação modificada. Os registros e a aceitação históricos permanecem
+inalterados.
 
 ## Reprocessamento de uma resposta histórica selecionada
 

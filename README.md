@@ -10,25 +10,28 @@ por Python. Modelo solicitado nos três papéis: `gpt-6-astra`, Max (`max`), Sta
 (`default`). Extra High (`xhigh`) só é selecionado se Max não constar do catálogo.
 Não há gerente modelo, subdelegação, Fast, Ultrafast ou fallback pago.
 
-**Validação sintética PHP/WordPress encerrada e aprovada sob extensão autorizada.**
-O run `570af15e2192e19f73ddaff7` concluiu os três papéis e passou nas 22 checagens
-com até 300 segundos por turno e extensão excepcional do teto global de 900 para
-1.500 segundos, restrita ao julgamento final. Totais: 11/16 chamadas e 1.009,27
-segundos acumulados. Não houve novo run, repetição de fases concluídas ou slots extras.
+**Execução real dos três agentes concluída na fixture sintética PHP/WordPress.**
+O run `e7a349ffa7b7bcdf47de1ab4`, executado com o controlador `2fa7530`, terminou
+com nove chamadas concluídas e 894,828 segundos acumulados. A aceitação histórica
+permanece em **22/24**, com estado bruto `partial` e fases concluídas.
 
-O estado bruto `partial` foi preservado. A revisão local prevista das 66 mensagens
-de limitação concluiu o escopo como `completed`, sem nova inferência nem alteração
-dos pareceres. A reprovação histórica sob 900 segundos permanece intacta. A
-aprovação vale para a fixture e os controles demonstrados; não é validação de um
-projeto real ou de produção. FAEPA permanece fora do escopo.
+A reavaliação **offline** dos mesmos registros aprovou **24/24** após revisar as
+72 ressalvas narrativas: 39 notas de escopo e 33 de procedimento. A política
+`explicit-narrative-v1` vincula cada decisão ao objetivo, texto integral, origens,
+revisor e evidências atuais, preservando os bloqueios estruturais e os originais.
+A suíte local final teve **602 testes aprovados, zero falhas e oito integrações
+Docker/live não executadas nessa etapa offline**.
+
+**A última alteração do avaliador não passou por uma nova execução real completa.**
+A aprovação derivada refere-se à execução anterior; não demonstra auditorias de
+projetos arbitrários nem homologação de produção. FAEPA permanece fora do escopo.
 
 Consulte o **[guia de uso da versão validada](docs/uso-versao-validada.md)** para
 preparação local, delimitação de escopo, comandos exatos, conferência financeira,
 início, acompanhamento, retomada, limites, resultados e limitações. Os
-[resultados consolidados](validation/php-wordpress-final-extension-20261112/result-summary.json),
-[a aceitação](validation/php-wordpress-final-extension-20261112/acceptance.json) e
-[o julgamento original](validation/php-wordpress-final-extension-20261112/original-final-judgment.json)
-são a referência encerrada; não repetir seus roteiros de execução.
+[resultados públicos consolidados](validation/public/integrated-20261112.json)
+distinguem o resultado histórico da reavaliação. Os registros completos permanecem
+privados na instalação local; não repetir seus roteiros de execução.
 
 A infraestrutura WSL aprovada em `20261110T210248Z-0d1e3ccb` e o histórico Python
 encerrado foram preservados. O [texto anterior de status](docs/historico-status-readme-20261112.md)
@@ -36,20 +39,22 @@ foi arquivado com suas referências, sem apagar falhas ou evidências anteriores
 
 ## Instalação
 
-Python 3.12 é o alvo testado (pacote admite 3.11+). Instale o **Codex CLI 0.167.0**
-pelo mecanismo oficial. O contrato experimental é fixado nessa versão. O projeto
+Python 3.12 é o alvo testado (pacote admite 3.11+). Use o **Codex CLI 0.167.0**
+oficial em instalação isolada. O contrato experimental é fixado nessa versão. O projeto
 não instala SDK de inferência, Agents SDK ou segunda linguagem.
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.lock
 .venv/bin/python -m pip install --no-build-isolation --no-deps -e .
-.venv/bin/python -m pytest -q -m 'not docker and not live'
-.venv/bin/audit3 doctor
-.venv/bin/audit3 codex-setup
+PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -q -m 'not docker and not live'
 ```
 
-Execute o comando de login mostrado por `codex-setup` no terminal normal: ele usa
+O [procedimento do cliente isolado](docs/uso-versao-validada.md#cliente-oficial-isolado-01670)
+seleciona o executável pelo PATH somente dos processos do auditor, preservando o
+cliente global `0.167.2` e as configurações de outros projetos. Inclui a verificação
+local `scripts/verify_codex_contract.py`, `doctor` e `codex-setup`.
+Se precisar de um login novo, execute o comando mostrado por `codex-setup`: ele usa
 `codex login --device-auth` no HOME privado do auditor. Nunca forneça senha, token,
 cookie ou cartão ao audit3. O Codex pessoal e suas variáveis globais não são alterados.
 `audit3 doctor --probe-codex` consulta metadados oficiais sem iniciar turnos.
@@ -87,7 +92,7 @@ O smoke, a confirmação financeira, retomada e limitações estão em
 - [Segurança](docs/seguranca.md)
 - [Operação](docs/operacao.md)
 - [WordPress e browser](docs/wordpress.md)
-- [Resultado aprovado PHP/WordPress](validation/php-wordpress-final-extension-20261112/result-summary.json)
+- [Resultado atual e limites da validação PHP/WordPress](validation/public/integrated-20261112.json)
 - [Preparação histórica dos agentes em 10/11](validation/agents-readiness-20261110/report.md)
 
 Resultados anteriores em `validation/` e documentação histórica identificada como

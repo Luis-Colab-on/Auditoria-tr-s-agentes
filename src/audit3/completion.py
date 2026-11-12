@@ -1,7 +1,7 @@
 """Versioned scoped completion. Narrative uncertainty is never silently dropped."""
 from .security import object_hash, PolicyError
 
-VERSION = 'scoped-assessment-4'
+VERSION = 'scoped-assessment-5'
 
 
 def pointer(document, path):
@@ -85,6 +85,8 @@ def assess_completion(report, review=None, required=None):
     for key in ('source_integrity', 'final_validation', 'limits_valid'):
         if checks.get(key) is not True:
             blockers.append({'kind': key, 'text': checks.get(key + '_error', key + ' não demonstrado')})
+    if checks.get('isolation_valid') is False:
+        blockers.append({'kind': 'isolation', 'text': 'Isolamento incompatível'})
     if report.get('causal_validation', {}).get('valid') is not True:
         blockers.append({'kind': 'causality', 'text': 'Validação causal ausente/inválida'})
     if report['state'].get('status') in {'blocked', 'cancelled', 'failed'}:
@@ -105,7 +107,8 @@ def assess_completion(report, review=None, required=None):
         entry = {'message_hash': key, **message, 'kind': 'unresolved',
                  'justification': 'Limitação ainda não classificada para este objetivo', 'evidence': []}
         if annotation:
-            if (set(annotation) - {'kind', 'justification', 'evidence', 'policy', 'criterion'}
+            if (set(annotation) - {'kind', 'justification', 'evidence', 'policy', 'criterion',
+                    'original_text', 'original_hash', 'origins', 'requirements_hash', 'claims'}
                 or annotation.get('kind') not in {'blocking', 'scope_note', 'procedure_note', 'unresolved'}
                 or not isinstance(annotation.get('justification'), str)
                 or not annotation['justification'].strip()
@@ -116,11 +119,11 @@ def assess_completion(report, review=None, required=None):
                     pointer(report, reference)
                 except (KeyError, IndexError, TypeError, ValueError):
                     raise PolicyError('Evidência da classificação de limitação não encontrada') from None
-            if annotation['kind'] in {'scope_note', 'procedure_note'}:
+            if annotation['kind'] in {'scope_note', 'procedure_note'} or annotation.get('policy') == 'explicit-narrative-v1':
                 from .scope_review import validate_annotation
                 try:
                     validate_annotation(report, message, annotation, review=review)
-                except PolicyError as exc:
+                except (PolicyError, KeyError, TypeError, ValueError) as exc:
                     entry['justification'] = str(exc)
                 else:
                     entry.update(annotation)

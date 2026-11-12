@@ -1,6 +1,6 @@
 # Uso da versão validada do audit3
 
-Referência encerrada em 12/11/2026: run **`570af15e2192e19f73ddaff7`**, cenário
+Referência atual encerrada em 12/11/2026: run **`e7a349ffa7b7bcdf47de1ab4`**, cenário
 sintético pequeno PHP/WordPress. Esta página consolida a operação implementada e
 o alcance demonstrado. Não inicia nem autoriza auditoria de outro projeto. FAEPA
 permanece fora do escopo.
@@ -16,7 +16,59 @@ a fixture sintética e a configuração base, sem confirmações financeiras, id
 de conta ou registros do cliente. Links para originais excluídos são referências
 locais. Esta separação não altera os resultados nem os arquivos históricos.
 
-## Referência aprovada e histórico preservado
+## Resultado atual: execução real e reavaliação offline
+
+Auditor, Defensor e Juiz participaram efetivamente com três chamadas concluídas
+por papel, em sessões distintas: **nove chamadas e 894,828 segundos acumulados**.
+Foram utilizados `gpt-6-astra`, esforço `max`, Standard (`default`) e o cliente
+oficial isolado `0.167.0`. O controlador executado corresponde ao commit
+`2fa7530183f11f074a68fa149f01cf9a1991447e`.
+
+| Resultado | Estado preservado ou derivado |
+|---|---|
+| Execução real e julgamento | Nove fases concluídas; fonte e controles preservados |
+| Estado operacional bruto | `partial`, `phase=done` |
+| Aceitação histórica | **22/24**, preservada sem reescrever resultados |
+| Reavaliação offline dos mesmos registros | **24/24**, conclusão revisada `completed` |
+| Ressalvas narrativas examinadas | 72: 39 notas de escopo e 33 de procedimento; nenhuma bloqueante ou pendente para o objetivo |
+| Avaliador da reavaliação | `scoped-assessment-5`, política `explicit-narrative-v1` |
+| Suíte local final | **602 aprovados, zero falhas, oito integrações Docker/live não executadas na etapa offline** |
+
+O baseline e as reproduções dos três papéis demonstram `(10, 3) → 13`, quando o
+contrato exige `7`. As guardas de entradas inválidas e a autorização administrativa
+foram preservadas. Os três IDs permanecem separados, com `root_cause_id=null`;
+não são uma contagem de três defeitos independentes. A fixture mantém o defeito.
+
+A política nova exige exame integral de cada mensagem e de suas afirmações,
+requisitos originais, proveniência e predicados verificáveis sobre evidências
+atuais. A interpretação semântica fica sob responsabilidade explícita do revisor;
+um rótulo ou ponteiro não basta. Lacunas estruturais continuam bloqueantes.
+Veja [revisão de conclusão](reprocessamento-local.md).
+
+**A alteração mais recente do avaliador foi validada localmente, sem nova execução
+real completa dos três agentes.** A aprovação 24/24 é uma derivação offline da
+execução anterior, não uma execução da implementação modificada. O consumo agregado
+de tokens e custo continua desconhecido; amostras oficiais não são somadas.
+
+O [resumo público atual](../validation/public/integrated-20261112.json) não inclui
+dados de conta ou sessões. Os originais ficam localmente em
+`validation/integrated-20261112T183050Z-2fa7530/continuation-20261112T184227Z/`;
+os resultados derivados ficam separados em
+`validation/offline-review-e7a349f-20261112T195018Z/`. Esses diretórios privados
+não acompanham o download do GitHub. A conferência de preservação verificou 200
+arquivos históricos idênticos por hash.
+
+O run atual autorizou até 1.500 segundos globais, 300 por turno e 16 chamadas,
+somente com as tentativas previstas. Esses limites não se transferem para outro
+run. A primeira suíte offline teve uma falha de ordem temporal no mock; o teste
+isolado e a repetição integral passaram sem alterações. Os logs foram preservados
+localmente. Não retomar nem repetir o run encerrado.
+
+## Referência anterior e histórico preservado
+
+O run anterior **`570af15e2192e19f73ddaff7`** e sua revisão anterior permanecem
+preservados. Os números e links desta seção pertencem somente a essa referência,
+sem substituir os resultados atuais acima.
 
 Os três papéis leram o código e produziram reproduções reais em Compose. O Juiz
 concluiu o julgamento: a reserva `(10, 3)` retorna `13`, contrariando o resultado
@@ -63,8 +115,8 @@ dependeu de fusão causal PHP e não estabelece três defeitos independentes.
 
 Os registros anteriores continuam em `validation/php-wordpress-smoke-20261111/` e
 `validation/php-wordpress-timeout-20261112/`. O histórico Python encerrado também foi
-preservado. Os hashes documentam o código de cada etapa; esta consolidação altera
-somente documentação, sem atualizar retroativamente esses hashes históricos.
+preservado. Os hashes documentam o código de cada etapa e não são atualizados
+retroativamente.
 
 **Não retomar nem repetir o run de referência.** Ele está encerrado. Os roteiros
 em `validation/` são vinculados aos respectivos IDs, autorizações e tentativas;
@@ -102,11 +154,70 @@ Mantenha o mesmo Store absoluto, com seu HOME privado e login oficial. Não copi
 `auth.json`, tokens ou `.integrity-key` para relatórios, outro projeto ou outro Store.
 Uma instalação/login novo tem procedimento próprio em [Codex Pro](codex-pro.md).
 
+## Cliente oficial isolado 0.167.0
+
+O auditor resolve `codex` pelo PATH e executa o binário nativo oficial. Na
+instalação WSL x86_64 usada na validação, selecione o cliente separado assim:
+
+```bash
+cd "$HOME/projetos/auditoria-tres-agentes"
+AUDIT3_RAIZ="$PWD"
+AUDIT3_STORE="$AUDIT3_RAIZ/.audit3"
+AUDIT3_CLIENTE="$HOME/.local/share/audit3/clients/codex-0.167.0"
+AUDIT3_CODEX_BIN="$AUDIT3_CLIENTE/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin"
+
+audit3_python() {
+  PATH="$AUDIT3_CODEX_BIN:$PATH" "$AUDIT3_RAIZ/.venv/bin/python" "$@"
+}
+
+test -x "$AUDIT3_CODEX_BIN/codex"
+"$AUDIT3_CODEX_BIN/codex" --version
+audit3_python -c 'from audit3.codex_policy import executable; print(executable())'
+```
+
+O resultado de versão deve ser **`codex-cli 0.167.0`** e o caminho resolvido deve
+estar nessa instalação isolada. O diretório vem da distribuição oficial
+`@openai/codex@0.167.0`; não contém o código do projeto nem o HOME de autenticação
+do auditor. Se não existir, obtenha a versão exata pela distribuição oficial em
+diretório separado antes de continuar. Não substitua silenciosamente por outra
+versão nem altere o verificador. Em outra arquitetura, use o binário oficial
+correspondente, sem reutilizar o caminho x86_64.
+
+A função só define PATH no processo chamado. Não execute `export PATH`, não edite
+arquivos de inicialização do shell e não substitua o cliente global `0.167.2`.
+Repita a definição da função em outro terminal quando precisar dela. As sessões e
+configurações dos demais projetos permanecem separadas do HOME privado do auditor.
+
+Antes de uma futura auditoria autorizada, verifique o contrato local:
+
+```bash
+audit3_python "$AUDIT3_RAIZ/scripts/verify_codex_contract.py"
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" doctor
+```
+
+O verificador testa configuração, protocolo e ferramentas com sessões temporárias
+sem `turn/start`, sem login e sem inferência. O contrato deve retornar `passed` e
+`client_version: 0.167.0`. Isso não confirma a conta nem a franquia.
+
+Reutilize o login privado existente. Somente para um Store sem preparação/login:
+
+```bash
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" codex-setup
+```
+
+Execute no terminal o comando de login oficial que ele mostrar. Não copie
+credenciais pessoais. Depois siga a preparação, a conferência factual e o
+preflight das próximas seções; somente então use `run --prepared`.
+
 ## Preparar uma cópia local e delimitar o escopo
 
 Os blocos seguintes documentam **uma futura auditoria local expressamente
 autorizada**, não uma execução nesta etapa. Substitua os caminhos e marcadores
 antes de usá-los. Não aponte para FAEPA nem para o run encerrado de referência.
+
+Selecione primeiro o [cliente isolado](#cliente-oficial-isolado-01670).
+Os comandos deste guia usam `audit3_python`, definido nessa etapa, para manter o
+PATH específico somente nos processos do auditor.
 
 Na raiz da instalação existente:
 
@@ -168,7 +279,7 @@ Não carregue perfis ou comandos automaticamente da fonte recebida.
 Preparação Git com o perfil existente:
 
 ```bash
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" prepare \
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" prepare \
   --repo "$AUDIT3_TRABALHO/fonte.git" --ref "$AUDIT3_COMMIT" \
   --profile wordpress --config "$AUDIT3_TRABALHO/config.json" \
   --requirements "$AUDIT3_TRABALHO/requisitos.txt"
@@ -177,7 +288,7 @@ Preparação Git com o perfil existente:
 Alternativa ZIP, **em lugar** da preparação Git:
 
 ```bash
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" prepare \
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" prepare \
   --repo "$AUDIT3_TRABALHO/fonte.zip" \
   --profile wordpress --config "$AUDIT3_TRABALHO/config.json" \
   --requirements "$AUDIT3_TRABALHO/requisitos.txt"
@@ -188,7 +299,7 @@ Alternativa ZIP, **em lugar** da preparação Git:
 
 ```bash
 AUDIT3_RUN='SUBSTITUA_PELO_ID_RETORNADO'
-.venv/bin/python - "$AUDIT3_STORE" "$AUDIT3_RUN" <<'PY'
+audit3_python - "$AUDIT3_STORE" "$AUDIT3_RUN" <<'PY'
 import json, sys
 from pathlib import Path
 from audit3.evidence import Store
@@ -204,7 +315,7 @@ PY
 Consulte a mesma conta autenticada pelo mecanismo oficial:
 
 ```bash
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" doctor --probe-codex \
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" doctor --probe-codex \
   > "$AUDIT3_TRABALHO/doctor.json"
 ```
 
@@ -220,7 +331,7 @@ com data e fuso, sem aproveitar uma confirmação vencida:
 ```bash
 AUDIT3_FINGERPRINT='SUBSTITUA_PELO_HASH_OFICIAL_DO_DOCTOR'
 AUDIT3_CHECKED_AT='SUBSTITUA_PELO_HORARIO_REAL_ISO8601_COM_FUSO'
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" financial-confirm "$AUDIT3_RUN" \
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" financial-confirm "$AUDIT3_RUN" \
   --account-fingerprint "$AUDIT3_FINGERPRINT" \
   --auto-recharge disabled --extra-credits none --checked-at "$AUDIT3_CHECKED_AT"
 ```
@@ -229,7 +340,7 @@ Não há subcomando CLI `preflight`. A chamada existente abaixo faz o preflight
 completo separadamente, sem inferência e sem tocar em slots ou iniciar Docker:
 
 ```bash
-.venv/bin/python - "$AUDIT3_STORE" "$AUDIT3_RUN" <<'PY'
+audit3_python - "$AUDIT3_STORE" "$AUDIT3_RUN" <<'PY'
 import asyncio, json, sys
 from pathlib import Path
 from audit3.evidence import Store
@@ -262,7 +373,7 @@ Não há API paga, compra de créditos ou fallback como alternativa ao bloqueio.
 Com escopo revisto, fatos válidos e preflight aprovado, o comando de inferência é:
 
 ```bash
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" run --prepared "$AUDIT3_RUN"
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" run --prepared "$AUDIT3_RUN"
 ```
 
 O Workflow usa o baseline congelado ou o executa em Docker/Compose antes dos
@@ -274,7 +385,7 @@ das expectativas do teste.
 Em outro terminal, na mesma raiz e com as mesmas variáveis/Store, acompanhe:
 
 ```bash
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" status "$AUDIT3_RUN"
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" status "$AUDIT3_RUN"
 ```
 
 `status` lê estado e ledger. As fases podem ser `initial-0000`, `blind`, `contest`,
@@ -285,7 +396,7 @@ o interprete como contador em tempo real durante um turno.
 Para solicitar interrupção de uma execução ativa:
 
 ```bash
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" cancel "$AUDIT3_RUN"
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" cancel "$AUDIT3_RUN"
 ```
 
 Após diagnosticar a interrupção, confirmar que há fase e tentativa disponíveis e
@@ -293,7 +404,7 @@ renovar **somente por nova conferência real** os fatos que tenham vencido, exec
 o preflight acima e então:
 
 ```bash
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" resume "$AUDIT3_RUN"
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" resume "$AUDIT3_RUN"
 ```
 
 `resume` usa o mesmo ID, snapshot, backend, modelo, conta, Store e sessões dos
@@ -318,14 +429,15 @@ bloqueio, conclusão de fases e revisão das notas.
 Para um futuro run em andamento ou encerrado, os comandos existentes são:
 
 ```bash
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" report "$AUDIT3_RUN"
-.venv/bin/python -m audit3.cli --store "$AUDIT3_STORE" export "$AUDIT3_RUN" \
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" report "$AUDIT3_RUN"
+audit3_python -m audit3.cli --store "$AUDIT3_STORE" export "$AUDIT3_RUN" \
   --output "$AUDIT3_TRABALHO/resultado.zip"
 ```
 
-Eles geram relatórios/exportações locais, sem modelos. `report` e `export` atualizam
-os arquivos derivados do Store; para a referência encerrada, prefira ler os
-artefatos preservados na primeira tabela, sem regenerá-los.
+Eles geram relatórios/exportações locais, sem modelos. `report` atualiza arquivos
+derivados do Store; `export` usa leitura e cria um destino novo. Para runs
+encerrados, leia os artefatos preservados. Para revisar a conclusão separadamente,
+use `review-completion`, conforme o [procedimento offline](reprocessamento-local.md).
 
 | Informação | Store ou relatório |
 |---|---|
@@ -357,11 +469,11 @@ e o valor do plano consultado permanecem locais. O código só
 seleciona `xhigh` quando `max` não está no catálogo oficial; esse fallback não foi
 o esforço usado neste run. Não há troca automática para outro provedor pago.
 
-| Parâmetro | Base do run encerrado | Efetivo na aprovação | Defaults sem config / `examples/config.json` |
+| Parâmetro | Base pública / run anterior | Autorizado no run atual | Defaults sem config / `examples/config.json` |
 |---|---:|---:|---:|
 | Chamadas App Server (`max_calls`) | 16 | 16 | 48 |
 | Tempo por turno (`call_timeout`) | 120 s | até 300 s, autorizado | 120 s |
-| Tempo global acumulado | 900 s | 1.500 s, extensão final apenas | 1.800 s |
+| Tempo global acumulado | 900 s | 1.500 s desde a preparação | 1.800 s |
 | Passos de ferramenta por turno (`max_turns`) | 12 | 12 | 12 |
 | Tempo do processo de teste (`test_timeout`) | 60 s | 60 s | 60 s |
 | Novas reproduções (`max_reproductions`) | 12 | 12 | 12 |
