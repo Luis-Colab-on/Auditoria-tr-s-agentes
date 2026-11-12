@@ -1,0 +1,1 @@
+{"name":"wordpress","engine":"compose","languages":["php","browser","wp-cli"],"baseline":["php","/source/tests/run.php"],"plugin_slug":"synthetic-plugin","wp_image":"audit3-wordpress:local","db_image":"mysql:8.4.3","db_memory_mb":1024,"browser_image":"audit3-browser:local"}

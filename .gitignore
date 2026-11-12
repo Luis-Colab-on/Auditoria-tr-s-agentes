@@ -1,0 +1,57 @@
+# Ambientes, caches e artefatos gerados
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+*.py[cod]
+node_modules/
+vendor/
+.coverage
+htmlcov/
+
+# Estado privado, autenticação e sessões: nunca versionar
+.audit3/
+.codex/
+.agents/
+.aws/
+.ssh/
+.git-credentials
+.integrity-key
+auth.json
+credentials.json
+*.pem
+*.key
+*.session
+.netrc
+.pypirc
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+wp-config.php
+!src/audit3/assets/wp-config.php
+
+# Logs e pacotes podem incorporar fonte privada, contas e históricos do cliente
+*.log
+*.log.*
+*.jsonl
+*.zip
+*.whl
+*.tar
+*.tar.gz
+
+# Originais operacionais permanecem somente locais. Lista pública explícita.
+/validation/*
+!/validation/public/
+!/validation/php-wordpress-smoke-20261111/
+/validation/php-wordpress-smoke-20261111/*
+!/validation/php-wordpress-smoke-20261111/config.json
+
+# Texto histórico contém uma conferência financeira factual; preservar localmente.
+/docs/historico-status-readme-20261112.md

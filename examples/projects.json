@@ -1,0 +1,12 @@
+{
+  "notice": "Catálogo ilustrativo para futura integração MCP; não é lido automaticamente pelo MVP.",
+  "projects": {
+    "synthetic-ledger": {
+      "local_repo": "/caminho/controlado/pelo-operador/ledger",
+      "allowed_profiles": ["generic"],
+      "require_explicit_commit": true,
+      "authorization_per_run": true,
+      "budget_usd": 5
+    }
+  }
+}

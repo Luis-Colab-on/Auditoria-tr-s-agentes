@@ -1,0 +1,158 @@
+{
+  "format": "sanitized-public-validation-summary-1",
+  "validation_date": "2026-11-12",
+  "scope": "Synthetic PHP/WordPress stock fixture only; no production or external project audit",
+  "acceptance": "passed",
+  "completion": {
+    "raw_state": "partial",
+    "raw_phase": "done",
+    "reviewed_scope": "completed",
+    "reviewed_note_count": 66,
+    "offline_review": true,
+    "original_answers_edited": false
+  },
+  "technical_checks": [
+    {
+      "name": "local_preparation",
+      "passed": true
+    },
+    {
+      "name": "phase_done",
+      "passed": true
+    },
+    {
+      "name": "codex_real_backend",
+      "passed": true
+    },
+    {
+      "name": "coverage",
+      "passed": true
+    },
+    {
+      "name": "causal_validation",
+      "passed": true
+    },
+    {
+      "name": "three_roles_completed_calls",
+      "passed": true
+    },
+    {
+      "name": "limits",
+      "passed": true
+    },
+    {
+      "name": "three_distinct_threads",
+      "passed": true
+    },
+    {
+      "name": "unique_invocations",
+      "passed": true
+    },
+    {
+      "name": "blind_barrier",
+      "passed": true
+    },
+    {
+      "name": "source_reads_three_roles",
+      "passed": true
+    },
+    {
+      "name": "judge_inspects_mechanism_and_control",
+      "passed": true
+    },
+    {
+      "name": "baseline_evaluated",
+      "passed": true
+    },
+    {
+      "name": "judge_reads_evidence",
+      "passed": true
+    },
+    {
+      "name": "model_submitted_compose_reproduction",
+      "passed": true
+    },
+    {
+      "name": "one_verdict_per_id",
+      "passed": true
+    },
+    {
+      "name": "no_unverified_merge",
+      "passed": true
+    },
+    {
+      "name": "protected_checkout_unchanged",
+      "passed": true
+    },
+    {
+      "name": "scoped_completion",
+      "passed": true
+    },
+    {
+      "name": "semantic_review_complete",
+      "passed": true
+    },
+    {
+      "name": "known_defect_identified",
+      "passed": true
+    },
+    {
+      "name": "correct_case_preserved",
+      "passed": true
+    }
+  ],
+  "model": {
+    "roles": [
+      "auditor",
+      "defensor",
+      "juiz"
+    ],
+    "model": "gpt-6-astra",
+    "effort": "max",
+    "service_tier": "default",
+    "client_version": "0.167.0"
+  },
+  "operational_limits": {
+    "base_total_seconds": 900,
+    "authorized_total_seconds": 1500,
+    "turn_seconds": 300,
+    "max_calls": 16,
+    "extension_scope": "Final judgment only; existing slot; no resets or additional slots"
+  },
+  "recorded_totals": {
+    "elapsed_seconds": 1009.2657987909915,
+    "calls": 11,
+    "completed_calls": 9,
+    "historical_error_calls": 2,
+    "aggregate_tokens": null,
+    "aggregate_cost": null
+  },
+  "known_defect": {
+    "input_stock": 10,
+    "input_reservation": 3,
+    "expected": 7,
+    "observed": 13,
+    "confirmed_by_three_roles": true
+  },
+  "protected_controls": {
+    "source_unchanged": true,
+    "invalid_inputs_rejected": true,
+    "anonymous_and_subscriber_denied": true,
+    "administrator_allowed": true
+  },
+  "causality": {
+    "one_verdict_per_id": true,
+    "formal_grouping": false,
+    "independent_defect_count": null
+  },
+  "historical_original_900_result": "failed; preserved locally",
+  "limitations": [
+    "No external HTTP authentication test",
+    "No production or temporal-origin proof",
+    "Defect demonstrated in returned value, not persisted stock",
+    "Integer maximums and out-of-domain coercion not exercised",
+    "No PHP causal equivalence certificate; IDs preserved without independent-defect count",
+    "Fixture defect deliberately preserved; proposed correction not implemented"
+  ],
+  "publication_note": "Derived summary only. Private source records, financial confirmations, account identity, client sessions and original exports are excluded, preserved locally and not publicly attested by this file."
+}

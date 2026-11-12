@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools==78.1.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audit3"
+version = "0.2.0"
+description = "Auditoria local com três agentes, barreiras e evidências verificáveis"
+requires-python = ">=3.11"
+dependencies = ["pydantic==2.13.4"]
+
+[project.optional-dependencies]
+runtime = [] # Official codex-cli 0.167.0 installed separately; stdio uses stdlib.
+dev = ["pytest==9.1.1"]
+
+[project.scripts]
+audit3 = "audit3.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+audit3 = ["prompts/*.txt", "profiles/*.json", "assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["fixtures"]
+pythonpath = ["src"]
+addopts = "-ra"
+markers = ["docker: requer Docker real", "live: requer Codex/ChatGPT e verificação financeira factual"]

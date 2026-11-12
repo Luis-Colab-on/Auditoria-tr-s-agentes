@@ -1,0 +1,6 @@
+# audit3 Codex runtime: Python stdlib + core contracts. External CLI pinned separately.
+annotated-types==0.8.0
+pydantic==2.13.4
+pydantic-core==2.46.4
+typing-extensions==4.16.0
+typing-inspection==0.4.2

@@ -1,0 +1,1 @@
+{"name":"generic","engine":"docker","image":"python:3.12.8-slim-bookworm","languages":["python"],"baseline":["python","-B","-m","unittest","discover","-s","/source/tests","-v"]}

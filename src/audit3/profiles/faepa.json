@@ -1,0 +1,1 @@
+{"name":"faepa-template-not-validated","engine":"compose","languages":["php","browser","wp-cli"],"baseline":["php","/source/tests/run.php"],"plugin_slug":"faepa","woocommerce_required":true,"required_plugins":["woocommerce"],"wp_image":"audit3-wordpress:local","db_image":"mysql:8.4.3","browser_image":"audit3-browser:local"}

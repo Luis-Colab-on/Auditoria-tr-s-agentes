@@ -1,0 +1,250 @@
+{
+  "note": "Copied synthetic receipts for offline regression only; no test execution occurs when loading these copies. Private project path redacted.",
+  "receipts": {
+    "cccbb1a64524c12415db0396": {
+      "artifacts": {
+        "stderr_in_receipt": "9bbc67d25091d60c62ec2d04cd5e86d32ae681aedaaa3e303f2971c05dd7609f",
+        "stdout_in_receipt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "assertions": null,
+      "cases": null,
+      "command": [
+        "python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/source/tests",
+        "-v"
+      ],
+      "execution": "docker",
+      "exit_code": 1,
+      "failed_assertions": null,
+      "fingerprint": "eae0efe7d7dc5c0d8d48408e1988adf8e238745f65319a6aebd9f5f8414cf33a",
+      "finished_at": "2026-11-11T14:38:00.072949+00:00",
+      "id": "cccbb1a64524c12415db0396",
+      "image_ids": {
+        "runner": "sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0"
+      },
+      "limitations": [
+        "Exit code não mede cobertura; contagens não fornecidas são desconhecidas."
+      ],
+      "output_truncated": false,
+      "owner": "baseline",
+      "phase": "baseline",
+      "profile_hash": "362674c76c76f651d424a8dac7e241098499ed353a35397b8fef890a4bbca4fb",
+      "purpose": "testes de base factuais do snapshot",
+      "run_id": "21df9ba2793f0a1c6778ae8a",
+      "schema_version": "1.0",
+      "script_sha256": null,
+      "source_id": "d4dc0e4cf255893f783b5603ab206a00885f625b09a698d037714a86c2af5143",
+      "started_at": "2026-11-11T14:37:58.534833+00:00",
+      "status": "failed",
+      "stderr": "test_checkout_protects_internal_helper (test_app.Contract.test_checkout_protects_internal_helper) ... ok\ntest_refund_increases_balance (test_app.Contract.test_refund_increases_balance) ... FAIL\n\n======================================================================\nFAIL: test_refund_increases_balance (test_app.Contract.test_refund_increases_balance)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/source/tests/test_app.py\", line 7, in test_refund_increases_balance\n    self.assertEqual(balance_after_payment(100, -20), 120)\nAssertionError: 80 != 120\n\n----------------------------------------------------------------------\nRan 2 tests in 0.001s\n\nFAILED (failures=1)\n",
+      "stderr_sha256": "9bbc67d25091d60c62ec2d04cd5e86d32ae681aedaaa3e303f2971c05dd7609f",
+      "stdout": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "suites": null,
+      "timeout": false,
+      "versions": {
+        "docker": "29.9.3"
+      }
+    },
+    "296af7a367d6b911a7e33b85": {
+      "artifacts": {
+        "stderr_in_receipt": "d44e53580f2b2a65bf9d9e7879a06fc73fb7257803792253fd7062f20a020049",
+        "stdout_in_receipt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "submitted_test": "404cd6e0a3f06df7ad9123a0d940cb06e0d88d9800eadae70dec7dc71872ee18"
+      },
+      "assertions": null,
+      "cases": null,
+      "command": [
+        "python",
+        "-B",
+        "/test/repro.py"
+      ],
+      "execution": "docker",
+      "exit_code": 1,
+      "failed_assertions": null,
+      "fingerprint": "8bbc0a67b12553f25d98642e07cdca22ae2370df395779dbdae2ff54d1f65ecc",
+      "finished_at": "2026-11-11T14:41:24.323839+00:00",
+      "id": "296af7a367d6b911a7e33b85",
+      "image_ids": {
+        "runner": "sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0"
+      },
+      "limitations": [
+        "Exit code não mede cobertura; contagens não fornecidas são desconhecidas."
+      ],
+      "output_truncated": false,
+      "owner": "defensor",
+      "phase": "initial-0000",
+      "profile_hash": "362674c76c76f651d424a8dac7e241098499ed353a35397b8fef890a4bbca4fb",
+      "purpose": "Reproduzir independentemente o contrato de reembolso identificado no baseline e verificar os controles de pagamento positivo/zero e da fronteira checkout para valores negativos, texto e valores não negativos, sem modificar fontes ou testes históricos.",
+      "run_id": "21df9ba2793f0a1c6778ae8a",
+      "schema_version": "1.0",
+      "script_sha256": "404cd6e0a3f06df7ad9123a0d940cb06e0d88d9800eadae70dec7dc71872ee18",
+      "source_id": "d4dc0e4cf255893f783b5603ab206a00885f625b09a698d037714a86c2af5143",
+      "started_at": "2026-11-11T14:41:23.058557+00:00",
+      "status": "failed",
+      "stderr": "test_checkout_desconta_nao_negativos (__main__.SmokeDefensor.test_checkout_desconta_nao_negativos) ... ok\ntest_checkout_rejeita_negativo_e_texto (__main__.SmokeDefensor.test_checkout_rejeita_negativo_e_texto) ... ok\ntest_pagamento_positivo_e_zero (__main__.SmokeDefensor.test_pagamento_positivo_e_zero) ... ok\ntest_reembolso_aumenta_saldo (__main__.SmokeDefensor.test_reembolso_aumenta_saldo) ... FAIL\n\n======================================================================\nFAIL: test_reembolso_aumenta_saldo (__main__.SmokeDefensor.test_reembolso_aumenta_saldo)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/test/repro.py\", line 10, in test_reembolso_aumenta_saldo\n    self.assertEqual(balance_after_payment(100, -20), 120)\nAssertionError: 80 != 120\n\n----------------------------------------------------------------------\nRan 4 tests in 0.001s\n\nFAILED (failures=1)\n",
+      "stderr_sha256": "d44e53580f2b2a65bf9d9e7879a06fc73fb7257803792253fd7062f20a020049",
+      "stdout": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "suites": null,
+      "timeout": false,
+      "versions": {
+        "docker": "29.9.3"
+      }
+    }
+  },
+  "tests": {
+    "cccbb1a64524c12415db0396": {
+      "repeat_reason": null,
+      "script": ""
+    },
+    "296af7a367d6b911a7e33b85": {
+      "repeat_reason": "independent_reproduction",
+      "script": "import sys\nimport unittest\n\nsys.dont_write_bytecode = True\nsys.path.insert(0, '/source')\nfrom app import balance_after_payment, checkout\n\nclass SmokeDefensor(unittest.TestCase):\n    def test_reembolso_aumenta_saldo(self):\n        self.assertEqual(balance_after_payment(100, -20), 120)\n\n    def test_pagamento_positivo_e_zero(self):\n        self.assertEqual(balance_after_payment(100, 20), 80)\n        self.assertEqual(balance_after_payment(100, 0), 100)\n\n    def test_checkout_rejeita_negativo_e_texto(self):\n        with self.assertRaises(ValueError):\n            checkout(-10)\n        with self.assertRaises(ValueError):\n            checkout('100')\n\n    def test_checkout_desconta_nao_negativos(self):\n        self.assertEqual(checkout(100), 90)\n        self.assertEqual(checkout(0), 0)\n\nunittest.main(verbosity=2)\n"
+    }
+  },
+  "auditor_initial": {
+    "invocation_id": "7f28fbbda9c2ed3a13482692",
+    "mode": "codex-app-server",
+    "output": {
+      "findings": [
+        {
+          "complete_flow": "A chamada recebe saldo 250 e pagamento -35; abs(-35) resulta em 35; a subtração retorna 215, sem ajuste posterior.",
+          "evidence_ids": [
+            "cccbb1a64524c12415db0396",
+            "6d40a1d7f497c0d64845986b"
+          ],
+          "expected": "Saldo final 285.",
+          "id": "auditor-sinal-reembolso",
+          "impact": "O saldo retornado fica abaixo do esperado em duas vezes o valor do reembolso; no caso reproduzido, a diferença é 70.",
+          "invariant": "Um reembolso representado por pagamento negativo deve aumentar o saldo pelo valor reembolsado.",
+          "limitations": [
+            "Reprodução sintética; não demonstra gravação de saldo nem perda financeira real.",
+            "Não há comparação assinada entre snapshots para determinar a origem."
+          ],
+          "mechanism": "A função subtrai abs(payment), tratando pagamentos negativos como débitos positivos.",
+          "necessary_conditions": [
+            "Pagamento negativo representando reembolso.",
+            "Saldo e pagamento numéricos compatíveis; inteiros bastam para reproduzir."
+          ],
+          "observed": "Saldo final 215; a asserção de reembolso falhou no executor Docker.",
+          "origin": "unknown",
+          "origin_evidence_ids": [],
+          "production_evidence": null,
+          "production_observation": "unknown",
+          "proof_method": "executed",
+          "protections_considered": [
+            "A função não possui outra etapa que preserve ou restaure o sinal.",
+            "A rejeição de negativos pertence ao checkout, que não participa do fluxo de balance_after_payment.",
+            "Pagamentos positivos e zero passaram nos controles, isolando o problema no tratamento do sinal."
+          ],
+          "real_environment_relevance": "A entrada é expressamente prevista pelo contrato da função. Entretanto, o material fornecido é apenas uma fixture, sem evidência de integração real.",
+          "refs": [
+            {
+              "end": 4,
+              "path": "app.py",
+              "schema_version": "1.0",
+              "sha256": "3df54d2d3581e067328bed08d8c1bf019b02961e85f9ab86a10ba0510e5638db",
+              "start": 2
+            },
+            {
+              "end": 2,
+              "path": "README.md",
+              "schema_version": "1.0",
+              "sha256": "4cadb0447b82d980249faf86bf589e8efa61745a43626a7de55aa0a05b77ff3f",
+              "start": 1
+            },
+            {
+              "end": 7,
+              "path": "tests/test_app.py",
+              "schema_version": "1.0",
+              "sha256": "789d21dcb2d78827fdc4fcbb6f4011d680d23b6d92552b8114a66e2de1260a68",
+              "start": 6
+            }
+          ],
+          "schema_version": "1.0",
+          "source_id": "d4dc0e4cf255893f783b5603ab206a00885f625b09a698d037714a86c2af5143",
+          "static_demonstration": "Para inteiros payment=-r, com r>0, a linha 4 calcula balance-r, enquanto o contrato exige balance+r.",
+          "title": "Reembolso reduz o saldo porque o sinal do pagamento é descartado",
+          "trigger": "Chamar balance_after_payment(250, -35)."
+        }
+      ],
+      "inspections": [
+        {
+          "analysis": "O contrato distingue dois fluxos. A expectativa de aumento por reembolso também aparece no comentário da função e no teste histórico.",
+          "flow_description": "Contrato confrontado com balance_after_payment e com checkout → calculate_discount.",
+          "flow_verified": true,
+          "limitations": [
+            "O README descreve um cenário sintético, sem dados de produção."
+          ],
+          "refs": [
+            {
+              "end": 2,
+              "path": "README.md",
+              "schema_version": "1.0",
+              "sha256": "4cadb0447b82d980249faf86bf589e8efa61745a43626a7de55aa0a05b77ff3f",
+              "start": 1
+            }
+          ],
+          "requirement": "Reembolsos aumentam o saldo; checkout rejeita valores negativos antes do helper interno.",
+          "schema_version": "1.0"
+        },
+        {
+          "analysis": "abs(payment) elimina o sinal necessário ao reembolso. Separadamente, checkout verifica tipo e negatividade antes de chamar calculate_discount; a ausência de validação duplicada no helper não constitui defeito nesse fluxo.",
+          "flow_description": "balance/payment → abs(payment) → subtração → saldo retornado. No checkout, tipo diferente de float/int ou valor menor que zero → ValueError; caso contrário → helper → multiplicação por 0.9.",
+          "flow_verified": true,
+          "limitations": [
+            "Não há integração externa ou persistência no código fornecido.",
+            "A verificação do checkout não comprova adequação de todos os valores especiais representáveis por float."
+          ],
+          "refs": [
+            {
+              "end": 15,
+              "path": "app.py",
+              "schema_version": "1.0",
+              "sha256": "3df54d2d3581e067328bed08d8c1bf019b02961e85f9ab86a10ba0510e5638db",
+              "start": 1
+            }
+          ],
+          "requirement": "Preservar o efeito contábil de pagamentos negativos e validar a entrada do helper no checkout.",
+          "schema_version": "1.0"
+        },
+        {
+          "analysis": "O baseline cccbb1a64524c12415db0396 registra falha no reembolso e sucesso no checkout. A reprodução 6d40a1d7f497c0d64845986b confirma a mesma causa com outros valores; controles de pagamento positivo, zero e checkout passaram.",
+          "flow_description": "Os testes chamam as funções reais. O baseline obtém 80 em vez de 120; a reprodução obtém 215 em vez de 285. As duas falhas representam uma única causa-raiz.",
+          "flow_verified": true,
+          "limitations": [
+            "Os casos executados não representam cobertura exaustiva dos tipos e valores possíveis."
+          ],
+          "refs": [
+            {
+              "end": 12,
+              "path": "tests/test_app.py",
+              "schema_version": "1.0",
+              "sha256": "789d21dcb2d78827fdc4fcbb6f4011d680d23b6d92552b8114a66e2de1260a68",
+              "start": 1
+            }
+          ],
+          "requirement": "Verificar os contratos existentes e executar reprodução pertinente sem modificar a fonte.",
+          "schema_version": "1.0"
+        }
+      ],
+      "limitations": [
+        "Nenhum intervalo atribuído ficou pendente; o inventário não contém configurações ou migrações.",
+        "Ocorrência em produção e origem histórica permanecem desconhecidas.",
+        "Fonte e testes históricos não foram alterados."
+      ],
+      "positions": [],
+      "schema_version": "1.0",
+      "summary": "Todos os intervalos atribuídos foram lidos. Uma falha comprovada: reembolsos diminuem o saldo. A reprodução Docker executou quatro casos, com uma falha. A proteção do checkout contra valores negativos funciona."
+    },
+    "phase": "initial-0000",
+    "published_at": "2026-11-11T14:40:41.370335+00:00",
+    "role": "auditor"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "base_url": "https://raw.githubusercontent.com/moby/profiles/main/seccomp/default.json",
+  "base_sha256": "15434cc9c9037d85b35027a60721bf45f381782b4283b01d94663366e71569f8",
+  "retrieved_at": "2026-11-10",
+  "namespace_rule_reference": "https://playwright.dev/docs/docker",
+  "rule_source": "https://github.com/microsoft/playwright/blob/v1.64.1/utils/docker/seccomp_profile.json",
+  "additional_unconditional_syscalls": [
+    "clone",
+    "setns",
+    "unshare",
+    "chroot"
+  ],
+  "scope": "browser runner only; no runtime download; preserve all base rules including clone3 ENOSYS fallback",
+  "license": "Apache-2.0; see browser-seccomp.LICENSE",
+  "chroot_rule_reference": "https://chromium.googlesource.com/chromium/src/+/lkgr/sandbox/linux/services/credentials.cc",
+  "chroot_evidence": "validation/20261110T204839Z-17f8d6db/evidence/wordpress-browser-receipt.json",
+  "chroot_rationale": "CapDrop ALL excludes the base CAP_SYS_CHROOT-gated rule at container setup. Permit syscall for Chromium empty-dir chroot inside its own user namespace, without adding any outer capability."
+}

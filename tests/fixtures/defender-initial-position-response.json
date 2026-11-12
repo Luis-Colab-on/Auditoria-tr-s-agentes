@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0",
+  "summary": "Todos os intervalos atribuídos foram lidos. Reprodução Docker concluída: 4 casos, 1 falha. Identificado um defeito em reembolsos; a proteção do helper pelo checkout está adequada ao fluxo verificado. Nenhuma fonte foi alterada.",
+  "inspections": [
+    {
+      "schema_version": "1.0",
+      "refs": [
+        {
+          "schema_version": "1.0",
+          "path": "README.md",
+          "start": 1,
+          "end": 2,
+          "sha256": "4cadb0447b82d980249faf86bf589e8efa61745a43626a7de55aa0a05b77ff3f"
+        },
+        {
+          "schema_version": "1.0",
+          "path": "app.py",
+          "start": 1,
+          "end": 6,
+          "sha256": "3df54d2d3581e067328bed08d8c1bf019b02961e85f9ab86a10ba0510e5638db"
+        }
+      ],
+      "requirement": "Reembolsos são pagamentos negativos e devem aumentar o saldo.",
+      "analysis": "abs(payment) elimina o sinal que distingue reembolso de pagamento. A reprodução 296af7a367d6b911a7e33b85 confirmou o erro e também confirmou resultados adequados para pagamento positivo e zero. Não há proteção intermediária nessa função.",
+      "flow_verified": true,
+      "flow_description": "balance_after_payment(100, -20) calcula abs(-20)=20 e retorna 80, contrariando o resultado contratual 120.",
+      "limitations": [
+        "Verificação em fixture sintética; nenhum consumidor de produção foi fornecido."
+      ]
+    },
+    {
+      "schema_version": "1.0",
+      "refs": [
+        {
+          "schema_version": "1.0",
+          "path": "app.py",
+          "start": 7,
+          "end": 15,
+          "sha256": "3df54d2d3581e067328bed08d8c1bf019b02961e85f9ab86a10ba0510e5638db"
+        },
+        {
+          "schema_version": "1.0",
+          "path": "README.md",
+          "start": 1,
+          "end": 2,
+          "sha256": "4cadb0447b82d980249faf86bf589e8efa61745a43626a7de55aa0a05b77ff3f"
+        }
+      ],
+      "requirement": "Checkout rejeita valores negativos antes de encaminhar entradas ao helper interno de desconto.",
+      "analysis": "A guarda verifica o tipo antes da comparação numérica e lança ValueError antes de chamar calculate_discount. O único chamador do helper no código fornecido é checkout. A ausência de validação duplicada no helper não constitui defeito nesse fluxo. A reprodução 296af7a367d6b911a7e33b85 confirmou rejeição de -10 e texto, além dos resultados para 100 e zero.",
+      "flow_verified": true,
+      "flow_description": "checkout → validação de tipo e sinal → ValueError para entradas rejeitadas; entradas aceitas → calculate_discount → amount * 0.9.",
+      "limitations": [
+        "Os casos executados não cobrem valores numéricos especiais; o contrato fornecido não detalha sua política."
+      ]
+    },
+    {
+      "schema_version": "1.0",
+      "refs": [
+        {
+          "schema_version": "1.0",
+          "path": "tests/test_app.py",
+          "start": 1,
+          "end": 12,
+          "sha256": "789d21dcb2d78827fdc4fcbb6f4011d680d23b6d92552b8114a66e2de1260a68"
+        }
+      ],
+      "requirement": "Verificar os contratos documentados e executar reprodução pertinente sem modificar testes históricos.",
+      "analysis": "As expectativas dos testes são coerentes com o contrato: reembolso aumenta saldo, checkout rejeita negativo e aplica desconto. O baseline cccbb1a64524c12415db0396 executou 2 casos, com 1 falha. A reprodução independente 296af7a367d6b911a7e33b85 executou 4 casos, com 1 falha pela mesma causa-raiz; não são dois defeitos.",
+      "flow_verified": true,
+      "flow_description": "unittest importa as funções reais de app; o caso de reembolso compara 80 com 120 e falha, enquanto os controles de checkout passam.",
+      "limitations": [
+        "Os testes exercitam diretamente funções; não demonstram integração com sistemas externos."
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "schema_version": "1.0",
+      "id": "defensor-reembolso-sinal",
+      "source_id": "d4dc0e4cf255893f783b5603ab206a00885f625b09a698d037714a86c2af5143",
+      "title": "Reembolso negativo reduz o saldo em vez de aumentá-lo",
+      "mechanism": "O uso de abs(payment) remove o sinal negativo do reembolso antes de subtrair seu valor do saldo.",
+      "refs": [
+        {
+          "schema_version": "1.0",
+          "path": "app.py",
+          "start": 2,
+          "end": 4,
+          "sha256": "3df54d2d3581e067328bed08d8c1bf019b02961e85f9ab86a10ba0510e5638db"
+        },
+        {
+          "schema_version": "1.0",
+          "path": "README.md",
+          "start": 1,
+          "end": 2,
+          "sha256": "4cadb0447b82d980249faf86bf589e8efa61745a43626a7de55aa0a05b77ff3f"
+        },
+        {
+          "schema_version": "1.0",
+          "path": "tests/test_app.py",
+          "start": 5,
+          "end": 7,
+          "sha256": "789d21dcb2d78827fdc4fcbb6f4011d680d23b6d92552b8114a66e2de1260a68"
+        }
+      ],
+      "invariant": "Um pagamento negativo que representa reembolso deve aumentar o saldo pelo valor reembolsado.",
+      "trigger": "balance_after_payment(100, -20).",
+      "necessary_conditions": [
+        "Chamar a função com saldo numérico e pagamento negativo representando reembolso."
+      ],
+      "complete_flow": "A chamada recebe saldo 100 e pagamento -20; abs transforma -20 em 20; a função subtrai 20 e devolve 80 diretamente ao chamador.",
+      "protections_considered": [
+        "A validação de checkout pertence a outro fluxo e não é executada por balance_after_payment.",
+        "O teste histórico detecta a violação, mas não impede o cálculo incorreto.",
+        "Os controles de pagamento positivo e zero passaram na reprodução."
+      ],
+      "expected": "Saldo 120, conforme o contrato de reembolso e o teste histórico.",
+      "observed": "Saldo 80, confirmado no baseline e na reprodução independente.",
+      "evidence_ids": [
+        "cccbb1a64524c12415db0396",
+        "296af7a367d6b911a7e33b85"
+      ],
+      "proof_method": "executed",
+      "static_demonstration": "Em app.py:4, 100 - abs(-20) = 80; preservar o sinal produziria 100 - (-20) = 120.",
+      "limitations": [
+        "Demonstração restrita ao snapshot sintético; não comprova ocorrência em produção."
+      ],
+      "impact": "Saldo incorreto após reembolso: no caso reproduzido, fica 40 unidades abaixo do esperado.",
+      "real_environment_relevance": "Afetaria consumidores que utilizassem essa função para atualizar saldos após reembolsos. Nenhum uso real foi demonstrado.",
+      "production_observation": "unknown",
+      "production_evidence": null,
+      "origin": "unknown",
+      "origin_evidence_ids": []
+    }
+  ],
+  "positions": [
+    {
+      "schema_version": "1.0",
+      "finding_id": "defensor-reembolso-sinal",
+      "classification": "falha comprovada",
+      "decision": "corrigir agora",
+      "argument": "Contrato, análise estática e execução concordam. Recomenda-se subtrair payment preservando seu sinal. É uma alteração local e reversível; antes de integrar, verificar reembolso, pagamento positivo e zero. A correção não foi aplicada nem testada nesta auditoria.",
+      "evidence_ids": [
+        "cccbb1a64524c12415db0396",
+        "296af7a367d6b911a7e33b85"
+      ],
+      "changed_position": false
+    }
+  ],
+  "limitations": [
+    "Nenhuma lacuna de leitura nos intervalos atribuídos; a execução não representa cobertura exaustiva.",
+    "Não foram fornecidas evidências de produção.",
+    "Sem comparação assinada de snapshots, a origem do defeito permanece desconhecida."
+  ]
+}

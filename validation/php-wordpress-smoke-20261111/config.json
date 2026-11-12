@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "backend": "codex-app-server",
+  "models": {
+    "auditor": "gpt-6-astra",
+    "defensor": "gpt-6-astra",
+    "juiz": "gpt-6-astra"
+  },
+  "limits": {
+    "schema_version": "1.0",
+    "concurrency": 1,
+    "max_turns": 12,
+    "call_timeout": 120,
+    "test_timeout": 60,
+    "total_seconds": 900,
+    "max_calls": 16,
+    "max_output_tokens": 5000,
+    "max_output_bytes": 64000,
+    "max_input_bytes": 250000,
+    "max_reproductions": 12,
+    "max_repeats": 1,
+    "transient_retries": 0,
+    "invalid_output_retries": 1,
+    "batch_lines": 600,
+    "read_lines": 160,
+    "budget_usd": 5.0,
+    "call_reserve_usd": 0.1
+  },
+  "input_usd_per_million": null,
+  "output_usd_per_million": null,
+  "exclude": [],
+  "prior_reports": [
+    "audits/**",
+    "audit-reports/**"
+  ],
+  "github_allowlist": [],
+  "max_files": 10000,
+  "max_file_bytes": 2000000,
+  "max_total_bytes": 100000000
+}

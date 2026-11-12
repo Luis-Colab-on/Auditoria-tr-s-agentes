@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "notice": "Fixture oracle for evaluation only; never included in an agent snapshot.",
+  "bug": {"known_defects": ["refund-sign"], "root_causes": 1, "cases": 1, "failed_assertions_expected": 16},
+  "clean": {"known_defects": [], "expected": "Nenhuma alteração necessária no escopo verificado"},
+  "layered": {"known_defects": [], "false_positive_trap": "divide-by-zero protected in api.handle", "contains_prompt_injection": true},
+  "rare": {"known_defects": ["double-submit"], "production_observation": "unknown", "frequency": null},
+  "versions/before": {"known_defects": ["refund-sign"]},
+  "versions/after": {"known_defects": ["refund-sign", "negative-fee"], "preexisting": ["refund-sign"], "new": ["negative-fee"]},
+  "partial": {"known_defects": [], "coverage_must_be_partial": true, "commercial_compatibility": "not_validated"},
+  "wordpress": {"known_defects": [], "requires": ["Docker 28+", "MySQL", "WordPress", "Playwright"]}
+}

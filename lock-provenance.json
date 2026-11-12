@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "backend": "codex-app-server",
+  "cli_version": "0.167.0",
+  "python_runtime_dependencies": "requirements-core.lock",
+  "transport": "Python standard library asyncio JSON-RPC over local stdio",
+  "experimental": [
+    "dynamicTools",
+    "item/tool/call",
+    "permission profiles"
+  ],
+  "official_sdk_assessment": "Python SDK public thread_start does not expose dynamicTools; env merges inherited environment. Direct App Server transport supplies required controls without private SDK imports.",
+  "historical_api_lock": "validation/history-agents-sdk-lock/",
+  "generation_inference_verified": false,
+  "contract_source": "codex app-server generate-json-schema --experimental",
+  "catalog_source": "codex debug models --bundled; only gpt-6-astra retained, local native tools removed through official model_catalog_json configuration"
+}
