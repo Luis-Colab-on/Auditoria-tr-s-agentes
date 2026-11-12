@@ -71,7 +71,8 @@ def save_live_artifacts(store, manifest):
         write_json(path.with_name("three-agents-usage.json"), store.get(run_id, "ledger"))
         write_json(path.with_name("three-agents-events.json"), events)
         write_json(path.with_name("three-agents-location.json"), {"run_id": run_id, "store": str(store.root)})
-        export_zip(store, run_id, path.with_name("three-agents.zip"))
+        archive = 'three-agents-accepted.zip' if report.get('acceptance', {}).get('status') == 'passed' else 'three-agents.zip'
+        export_zip(store, run_id, path.with_name(archive))
     return report, events
 
 
@@ -110,4 +111,4 @@ def assert_real_process(store, manifest, report, events):
     assert {e["role"] for e in tools if e["tool"] == "read_source"} == {"auditor", "defensor", "juiz"}
     assert any(e["role"] == "juiz" and e["tool"] == "read_evidence" for e in tools)
     assert any(e["tool"] == "submit_test" for e in tools), "smoke requires a model-submitted reproduction"
-    assert any(r["owner"] in {"auditor", "defensor", "juiz"} and r["execution"] == "docker" and r["status"] in {"passed", "failed"} for r in report["receipts"])
+    assert any(r["owner"] in {"auditor", "defensor", "juiz"} and r["execution"] in {"docker", "compose"} and r["status"] in {"passed", "failed"} for r in report["receipts"])

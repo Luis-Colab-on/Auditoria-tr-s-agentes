@@ -13,6 +13,7 @@ from audit3.evidence import Store
 from audit3.schemas import EvidenceReceipt, SourceRef
 from audit3.security import PolicyError, digest, now, object_hash
 from audit3.snapshot import prepare
+from audit3.receipt_review import MEASUREMENT_NOTE
 from audit3.smoke_causality import (POLICY, MARKER, script, check_scope,
     prepare_smoke_evidence, certificates_for_smoke)
 from test_tools_schemas import finding, tools_for
@@ -56,12 +57,12 @@ class SyntheticExecutor:
                 stderr = 'MOCK setup/import failure; no test cases executed\n'
         receipt = EvidenceReceipt(id=eid, run_id=self.manifest.run_id, owner=owner, phase=phase,
             source_id=self.manifest.source_id, profile_hash=self.manifest.profile_hash,
-            fingerprint=object_hash(request), command=['MOCK', 'no-source-executed'], image_ids={},
+            fingerprint=object_hash(request), command=['MOCK', 'no-source-executed'], image_ids={'runner': 'sha256:' + 'e' * 64},
             versions={'fixture': 'synthetic-receipt-contract'}, started_at=now(), finished_at=now(),
             status='failed', exit_code=1, timeout=False, stdout='', stderr=stderr,
             stdout_sha256=digest(b''), stderr_sha256=digest(stderr.encode()), output_truncated=False,
             script_sha256=digest(request.script.encode()), purpose=request.purpose,
-            limitations=[], execution=self.execution)
+            limitations=[MEASUREMENT_NOTE], execution=self.execution)
         self.store.put(self.manifest.run_id, 'receipts/' + eid, receipt, immutable=True)
         self.store.put(self.manifest.run_id, 'tests/' + eid, {'script': request.script, 'repeat_reason': None}, immutable=True)
         return receipt

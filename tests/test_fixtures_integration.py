@@ -65,6 +65,8 @@ def test_three_real_agents_small_fixture(tmp_path):
         raw_report = build_report(store, m.run_id, use_review=False)
         store.put(m.run_id, 'assessment/completion-review', make_review(raw_report), immutable=True)
         report, events = save_live_artifacts(store, m)
+    from audit3.acceptance import assert_python_smoke_completion
+    assert_python_smoke_completion(report)
     assert_real_process(store, m, report, events)
     # One known mechanism; a protected helper must not create a second defect.
     from audit3.acceptance import assert_known_cause

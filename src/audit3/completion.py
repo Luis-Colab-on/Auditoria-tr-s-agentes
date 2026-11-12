@@ -1,7 +1,7 @@
 """Versioned scoped completion. Narrative uncertainty is never silently dropped."""
 from .security import object_hash, PolicyError
 
-VERSION = 'scoped-assessment-3'
+VERSION = 'scoped-assessment-4'
 
 
 def pointer(document, path):
@@ -66,6 +66,9 @@ def protocol_phases(manifest, config, additional_round=False):
 def assess_completion(report, review=None, required=None):
     messages = limitation_messages(report)
     review = review or {}
+    if review.get('draft') is True:
+        from .explicit_review import seal_review
+        review = seal_review(review)
     if review and (review.get('version') != VERSION or review.get('context_hash') != context_hash(report)
                    or review.get('objective') != report['manifest']['requirements']):
         raise PolicyError('Revisão de limitações não corresponde ao objetivo/evidências')
@@ -96,6 +99,9 @@ def assess_completion(report, review=None, required=None):
     entries = []
     for key, message in messages.items():
         annotation = annotations.get(key)
+        if (annotation and annotation.get('policy') == 'explicit-scope-v1'
+            and isinstance(annotation.get('justification'), str) and not annotation['justification'].strip()):
+            annotation = None  # An unfinished operator draft remains unresolved.
         entry = {'message_hash': key, **message, 'kind': 'unresolved',
                  'justification': 'Limitação ainda não classificada para este objetivo', 'evidence': []}
         if annotation:
@@ -113,7 +119,7 @@ def assess_completion(report, review=None, required=None):
             if annotation['kind'] in {'scope_note', 'procedure_note'}:
                 from .scope_review import validate_annotation
                 try:
-                    validate_annotation(report, message, annotation)
+                    validate_annotation(report, message, annotation, review=review)
                 except PolicyError as exc:
                     entry['justification'] = str(exc)
                 else:

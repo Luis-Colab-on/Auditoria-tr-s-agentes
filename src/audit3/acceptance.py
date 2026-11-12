@@ -43,10 +43,22 @@ def assert_scoped_completion(report):
         assert state['runtime_mode'] == 'codex-app-server', 'Backend mock/antigo não aceito'
         assert report['manifest']['backend'] == 'codex-app-server', 'Backend incompatível'
         baseline = [r for r in report['receipts'] if r['owner'] == 'baseline']
-        assert baseline and all(r['execution'] == 'docker' and r['status'] == 'failed'
+        assert baseline and all(r['execution'] in {'docker', 'compose'} and r['status'] in {'passed', 'failed'}
             and not r.get('timeout') and not r.get('output_truncated') for r in baseline), 'Baseline não executado/válido'
     except (KeyError, TypeError) as exc:
         raise AssertionError('Relatório malformado para aceitação: ' + str(exc)) from exc
     except PolicyError as exc:
         raise AssertionError('Revisão inválida: ' + str(exc)) from exc
     return {'status': 'passed', 'raw_status': state['status'], 'review_id': assessment['review_id']}
+
+
+def assert_python_smoke_completion(report):
+    """The known-defect Python smoke, unlike generic scope, needs failed tests."""
+    result = assert_scoped_completion(report)
+    from .scope_review import policy
+    expected = policy()
+    assert report['manifest']['requirements'] == expected['objective'], 'Objetivo fora do smoke Python'
+    assert {f['path']: f['sha256'] for f in report['manifest']['files']} == expected['files'], 'Fonte fora do smoke Python'
+    baseline = [r for r in report['receipts'] if r['owner'] == 'baseline']
+    assert baseline and all(r['execution'] == 'docker' and r['status'] == 'failed' for r in baseline), 'Smoke Python exige falha esperada no baseline'
+    return result

@@ -68,22 +68,20 @@ def response_view(store, run_id, invocation_id, raw, certificates):
         'roles/juiz/phases/final': phase, 'assessment/causal-certificates': certificates})
     workflow = Workflow(view, run_id)
     tools = SourceTools(view, workflow.manifest, workflow.config, None,
-        ToolContext(run_id, 'juiz', 'final', invocation_id))
+        ToolContext(run_id, 'juiz', 'final', 'report-validation'))
     workflow.validate_output(output, tools, final=True)
     return view
 
 
 def reprocess_response(store, run_id, invocation_id, raw, certificates, completion_review):
     view = response_view(store, run_id, invocation_id, raw, certificates)
-    report = build_report(view, run_id)
+    report = build_report(view, run_id, use_review=False)
     completion = assess_completion(report, completion_review)
     original_state = copy.deepcopy(report['state'])
-    report['state'] = {**original_state, 'status': completion['status'],
-        'limitations': [entry['text'] for entry in completion['limitations']],
-        'completion_blockers': completion['blockers'], 'assessment_version': VERSION,
-        'technical_result': 'offline_reprocessed: decisions recorded for the selected original response'}
-    report['limitations'] = [entry['text'] for entry in completion['limitations']]
-    report['validation'] = 'reprocessamento offline de evidências reais; nenhuma nova execução'
+    # The raw operational state belongs to the original run. Scope assessment
+    # is a separate derivation and must not rewrite raw status or its limitations.
+    report['validation'] = 'reprocessamento offline de registros existentes; nenhuma nova execução'
+    report['completion_review'] = copy.deepcopy(completion_review)
     report['completion_assessment'] = completion
     report['derivation'] = {'version': VERSION, 'new_real_execution': False,
         'original_response_sha256': digest(raw), 'selected_invocation_id': invocation_id,

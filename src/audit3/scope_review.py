@@ -46,7 +46,16 @@ def supporting_evidence(report, criterion):
             '/judgment', '/receipts', '/findings']
 
 
-def validate_annotation(report, message, annotation):
+def validate_annotation(report, message, annotation, review=None):
+    if annotation.get('policy') == 'explicit-scope-v1':
+        from .explicit_review import validate_annotation as validate_explicit
+        return validate_explicit(report, message, annotation, review or {})
+    if annotation.get('criterion') == 'executor-measurement' and annotation.get('policy') == POLICY:
+        from .receipt_review import validate_receipt_note
+        # Automatic interpretation is restricted to the frozen Python objective.
+        supporting_evidence(report, 'synthetic-inventory')
+        return validate_receipt_note(report, message, annotation,
+            {'quantitative_measurement_required': False})
     criterion = annotation.get('criterion')
     if criterion not in NOTES or annotation.get('policy') != POLICY:
         raise PolicyError('Classificação sem critério verificável suportado')
@@ -76,12 +85,30 @@ def make_review(report):
             except PolicyError:
                 continue  # Unknown or unsupported evidence remains unresolved.
             review['messages'][key] = annotation
+    from .receipt_review import MEASUREMENT_NOTE, supporting_receipt_evidence
+    for key, message in limitation_messages(report).items():
+        if message['text'] != MEASUREMENT_NOTE:
+            continue
+        try:
+            annotation = {'policy': POLICY, 'criterion': 'executor-measurement', 'kind': 'procedure_note',
+                'justification': 'O objetivo congelado do smoke verifica o protocolo e casos observados; '
+                    'não exige contagens quantitativas. Receipt íntegro preserva contagens desconhecidas e não prova cobertura.',
+                'evidence': supporting_receipt_evidence(report, message)}
+            validate_annotation(report, message, annotation)
+        except PolicyError:
+            continue
+        review['messages'][key] = annotation
     review['id'] = object_hash(review)
     return review
 
 
-def review_report(report):
+def review_report(report, review=None):
     """Return separate evaluation; never mutate raw state or saved responses."""
     from .completion import assess_completion
-    review = make_review(report)
+    review = make_review(report) if review is None else review
+    if not isinstance(review, dict):
+        raise PolicyError('Revisão deve ser um objeto JSON')
+    if review.get('draft') is True:
+        from .explicit_review import seal_review
+        review = seal_review(review)
     return {'review': review, 'completion_assessment': assess_completion(report, review)}

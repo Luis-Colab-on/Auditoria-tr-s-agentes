@@ -63,6 +63,7 @@ def test_full_live_acceptance_rejects_mock_or_unexecuted_baseline(failure):
         report['receipts'][0].update(execution='not_executed', status='blocked')
         # No scope notes: this case reaches the independent baseline guard.
         report['manifest']['limitations'] = []
+        report['receipts'][0]['limitations'] = []  # Isolate the independent baseline guard.
         report['state']['status'] = 'completed'
     report['completion_review'] = make_review(report)
     report['completion_assessment'] = assess_completion(report, report['completion_review'])

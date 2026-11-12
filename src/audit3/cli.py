@@ -91,8 +91,12 @@ def main(argv=None):
         if command == "export":
             sp.add_argument("--output", type=Path)
             sp.add_argument("--evidence", action="append")
-    review = sub.add_parser('review-completion', help='avaliar offline as notas do smoke sintético; preservar o run original')
+    review = sub.add_parser('review-completion', help='revisar conclusão offline: política Python ou revisão explícita; preservar o run original')
     review.add_argument('id')
+    review_mode = review.add_mutually_exclusive_group()
+    review_mode.add_argument('--template', action='store_true', help='gerar rascunho explícito; não aprova conclusão')
+    review_mode.add_argument('--review', type=Path, help='revisão explícita preenchida ou avaliação anterior')
+    review.add_argument('--export', type=Path, help='ZIP novo com relatório derivado, sem gravar no Store')
     review.add_argument('--output', type=Path, required=True, help='arquivo novo para avaliação separada')
     args = parser.parse_args(argv)
     try:
@@ -102,7 +106,11 @@ def main(argv=None):
                 result["official_metadata"] = asyncio.run(probe_codex(args.store))
             emit(result)
             return 0
-        store = Store(args.store)
+        if args.command in {'review-completion', 'export'}:
+            from .reprocess import ReadOnlyStore
+            store = ReadOnlyStore(args.store)
+        else:
+            store = Store(args.store)
         if args.command == "codex-setup":
             from .codex_policy import setup_home
             import shlex
@@ -137,12 +145,31 @@ def main(argv=None):
             from .report import build_report
             from .scope_review import review_report
             from .security import canonical
-            result = review_report(build_report(store, run_id, use_review=False))
+            if args.output.resolve().is_relative_to(store.root.resolve()):
+                raise PolicyError('Revisão exige saída separada do Store original')
+            if args.template and args.export:
+                raise PolicyError('Rascunho não pode ser exportado como avaliação')
+            report = build_report(store, run_id, use_review=False)
+            if args.template:
+                from .explicit_review import review_template
+                result = review_template(report)
+            else:
+                review_input = json.loads(args.review.read_text()) if args.review else None
+                if review_input and 'review' in review_input:
+                    review_input = review_input['review']
+                result = review_report(report, review_input)
+                result['raw_state'] = report['state']
+                result['runtime'] = report['runtime']
+                result['acceptance'] = {'status': 'not_evaluated',
+                    'reason': 'Conclusão do escopo não é validação de execução real nem aceitação específica'}
             # Exclusive creation prevents overwriting any historical artifact.
             with args.output.open('xb') as destination:
                 destination.write(canonical(result))
+            if args.export:
+                from .report import export_zip
+                export_zip(store, run_id, args.export, review=result['review'])
             emit(result)
-            return 0 if result['completion_assessment']['status'] == 'completed' else 2
+            return 0 if args.template or result['completion_assessment']['status'] == 'completed' else 2
         if args.command == "status":
             emit({"state": store.get(run_id, "state"), "usage": store.get(run_id, "ledger"), "cancel_requested": store.exists(run_id, "cancel")})
         elif args.command == "cancel":

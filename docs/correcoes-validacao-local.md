@@ -27,20 +27,35 @@ preparação podem produzir `partial`. Isso só é compatível com aceitação q
 protocolo está concluído, todas as verificações estruturais passam e existe uma
 revisão atual que justifique cada pendência restante.
 
-O avaliador `scoped-assessment-3` vincula a revisão ao objetivo, inventário,
+O avaliador `scoped-assessment-4` vincula a revisão ao objetivo, inventário,
 pareceres, julgamento, receipts, streams, consultas, barreira, comparações,
 contabilidade e estado operacional. A revisão tem ID por hash, versão, contexto,
 mensagens identificadas, critérios, justificativas e referências. Um ponteiro
 válido para qualquer parte do relatório não basta. Mudanças nas evidências
 invalidam a revisão; revisões antigas não são convertidas silenciosamente.
 
-O critério empacotado `python-smoke-v1` aplica-se exclusivamente ao objetivo e aos
-hashes da fixture `codex-smoke` publicados em `assets/smoke-review-policy.json`.
-Ele permite classificar apenas as notas de preparação sobre scanner heurístico e
-ausência de ocorrência em produção, verificando inventário integral, fonte
-íntegra, baseline executado e julgamento final. Outras limitações permanecem
-pendentes. Timeout, limites, falta de investigação, evidência, julgamento,
-contraditório ou integridade não viram notas de escopo. Mock continua mock.
+O critério automático empacotado `python-smoke-v1` continua restrito ao objetivo
+e aos hashes da fixture `codex-smoke` publicados em
+`assets/smoke-review-policy.json`. Ele pode classificar as notas de preparação
+sobre scanner heurístico e ausência de ocorrência em produção, além da ressalva
+normal do Executor sobre exit code e contagens desconhecidas. A classificação
+confere inventário, origem das mensagens e evidências; não remove seu texto e
+não converte contadores desconhecidos em zero. Uma frase igual em um parecer do
+modelo não recebe a autoridade de uma nota do controlador.
+
+A revisão explícita `explicit-scope-v1` oferece critérios para PHP/WordPress e
+outros inventários, sem cadastrar hashes de uma segunda fixture. O revisor
+identifica-se, interpreta o objetivo em campos estruturados, justifica cada nota
+e confirma o inventário/contexto atual. Se o objetivo exigir uma informação que
+a nota declara ausente, a dispensa continua bloqueada. Um baseline aprovado é
+compatível com a conclusão geral de código correto, inclusive sem achados; a
+falha esperada do baseline continua exigida pelo contrato específico do smoke.
+
+Timeout, isolamento incompatível, limites excedidos, falta de investigação,
+evidência, julgamento, contraditório ou integridade permanecem bloqueantes.
+Limitações desconhecidas não são classificadas automaticamente. Mock continua
+mock. O [procedimento de revisão explícita](reprocessamento-local.md) descreve os
+campos, critérios e comandos que preservam o estado bruto e os registros originais.
 
 A validação futura do smoke prepara duas reproduções de estorno e controles
 positivos com o recurso `assets/smoke-causality.py`, exclusivamente no executor
@@ -77,6 +92,18 @@ Avaliação offline separada de um run existente, sem modificar seus registros:
 O arquivo de saída deve ser novo e seu diretório deve existir. Código de saída 0
 significa escopo concluído; 2 indica pendências ou erro. A avaliação não declara
 que um mock seja real e não constitui, sozinha, aceitação do smoke.
+
+Para outros objetivos, gere um rascunho, preencha-o após examinar as evidências e
+valide-o em outro arquivo novo:
+
+```bash
+.venv/bin/audit3 --store /caminho/do/store review-completion ID --template --output /caminho/novo/modelo.json
+.venv/bin/audit3 --store /caminho/do/store review-completion ID --review /caminho/novo/modelo.json --output /caminho/novo/avaliacao-explicita.json
+```
+
+O código 0 de `--template` significa somente geração do rascunho. Esse comando
+não aprova notas. O segundo comando sela o rascunho preenchido sem alterar o
+contexto ao qual ele se refere e mantém pendências quando a revisão é insuficiente.
 
 Somente em uma tarefa futura explicitamente autorizada, com login dedicado,
 franquia oficial observável e conferência financeira factual ainda válida conforme

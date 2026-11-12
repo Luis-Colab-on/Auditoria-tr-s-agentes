@@ -110,11 +110,13 @@ def completion_fixture():
     synthetic assertions supplied to the unit under test, never real run evidence.
     """
     from audit3.scope_review import policy, NOTES
+    from audit3.receipt_review import MEASUREMENT_NOTE
+    from audit3.schemas import EvidenceReceipt
     catalog = policy()
     phases=['auditor/initial-0000','defensor/initial-0000','juiz/blind','auditor/contest',
             'defensor/contest','auditor/reply','defensor/reply','juiz/review','juiz/final']
     manifest = {'requirements': catalog['objective'], 'run_id': 'a' * 24, 'source_id': 'MOCK-source',
-        'backend': 'codex-app-server', 'limitations': [note[0] for note in NOTES.values()],
+        'backend': 'codex-app-server', 'profile_hash': 'd' * 64, 'limitations': [note[0] for note in NOTES.values()],
         'files': [{'path': path, 'sha256': sha, 'category': 'source'} for path, sha in catalog['files'].items()]}
     verdict = {'finding_id': 'auditor-synthetic', 'classification': 'falha comprovada',
                'decision': 'corrigir agora', 'root_cause_id': None, 'evidence_ids': ['b' * 24]}
@@ -133,10 +135,15 @@ def completion_fixture():
         'causal_validation': {'valid': True, 'gaps': [], 'version': VERSION},
         'findings': [finding], 'verdicts': [verdict], 'required_phases': phases.copy(),
         'proven_causal_groups': [{'member_ids': [finding['id']], 'proofs': []}],
-        'receipts': [{'id': 'b' * 24, 'owner': 'baseline', 'execution': 'docker', 'status': 'failed',
-            'timeout': False, 'output_truncated': False, 'run_id': manifest['run_id'],
-            'source_id': manifest['source_id'], 'purpose': 'MOCK receipt contract; no execution',
-            'stdout': '', 'stderr': 'MOCK failure transcript'}],
+        'receipts': [EvidenceReceipt(id='b' * 24, owner='baseline', phase='baseline',
+            execution='docker', status='failed', exit_code=1, timeout=False, output_truncated=False,
+            run_id=manifest['run_id'], source_id=manifest['source_id'], profile_hash=manifest['profile_hash'],
+            fingerprint='c' * 64, command=['MOCK', 'no-source-executed'],
+            image_ids={'runner': 'sha256:' + 'e' * 64}, versions={'fixture': 'synthetic-receipt-contract'},
+            started_at='2026-11-12T00:00:00+00:00', finished_at='2026-11-12T00:00:01+00:00',
+            purpose='MOCK receipt contract; no execution', stdout='', stderr='MOCK failure transcript',
+            stdout_sha256=digest(b''), stderr_sha256=digest(b'MOCK failure transcript'), script_sha256=None,
+            limitations=[MEASUREMENT_NOTE]).model_dump(mode='json')],
         'usage': {'calls': [], 'tokens': None, 'known_cost_usd': None},
         'runtime': {'backend': 'codex-app-server', 'fixture_only': True}}
     return report
@@ -155,7 +162,7 @@ def identify_review(review):
 
 def test_completed_means_concluded_scope_even_with_a_proven_defect():
     report=completion_fixture();assessment=assess_completion(report,scoped_review(report))
-    assert assessment['status']=='completed' and len(assessment['limitations'])==2
+    assert assessment['status']=='completed' and len(assessment['limitations'])==3
     assert report['judgment']['verdicts'][0]['classification']=='falha comprovada'
 
 

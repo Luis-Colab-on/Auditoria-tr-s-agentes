@@ -70,7 +70,8 @@ def main():
         (destination/name).write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
     (destination/'original-response.json').write_bytes(raw)
     print(json.dumps({'output':str(destination),'new_real_execution':False,
-        'derived_status':report['state']['status'] if report else 'evidence_gap',
+        'raw_status':report['state']['status'] if report else None,
+        'derived_status':report['completion_assessment']['status'] if report else 'evidence_gap',
         'derived_acceptance':acceptance['passed'],
         'cause_count':len(report['proven_causal_groups']) if report else None,
         'preserved_verdicts':len(report['verdicts']) if report else None},ensure_ascii=False,indent=2))

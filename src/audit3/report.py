@@ -280,15 +280,23 @@ def write_report(store: Store, run_id: str):
     return report
 
 
-def export_zip(store: Store, run_id: str, destination: Path, selected: list[str] | None = None):
-    report = write_report(store, run_id)
+def export_zip(store: Store, run_id: str, destination: Path, selected: list[str] | None = None, *, review=None):
+    # Exports derive a report without rewriting original report/coverage files.
+    if destination.resolve().is_relative_to(store.root.resolve()):
+        raise PolicyError('Exportação exige destino separado do Store original')
+    report = build_report(store, run_id, use_review=review is None)
+    if review is not None:
+        from .scope_review import review_report
+        evaluation = review_report(report, review)
+        report['completion_review'] = evaluation['review']
+        report['completion_assessment'] = evaluation['completion_assessment']
+        report['acceptance'] = {'status': 'not_evaluated', 'reason': 'Revisão de escopo não substitui aceitação específica'}
     content = {"report.md": markdown(report).encode(), "report.json": canonical(report), "coverage.json": canonical(report["coverage"]), "manifest.json": canonical(report["manifest"])}
     available = {r["id"]: r for r in report["receipts"]}
     if selected is None:
         selected = sorted({eid for f in report["findings"] for eid in f["evidence_ids"]} | {r["id"] for r in report["receipts"] if r["owner"] == "baseline"} | {eid for v in report["verdicts"] for eid in v.get("evidence_ids", [])})
     for eid in selected:
         if eid not in available:
-            from .security import PolicyError, object_hash
             raise PolicyError("evidência não publicada/não existente")
         content["evidence/" + eid + ".json"] = canonical(available[eid])
         content["evidence/" + eid + "-test.json"] = canonical(store.get(run_id, "tests/" + eid))
@@ -298,5 +306,6 @@ def export_zip(store: Store, run_id: str, destination: Path, selected: list[str]
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for path, data in content.items():
             archive.writestr(path, data)
-    atomic_write(destination, buffer.getvalue())
+    with destination.open('xb') as target:
+        target.write(buffer.getvalue())
     return destination
